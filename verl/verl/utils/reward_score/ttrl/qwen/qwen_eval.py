@@ -105,105 +105,101 @@ def qwen_reward_fn_gpqa(generated_text, golden_answer, task="gpqa"):
     #     accuracy = -1.0
     return accuracy
 
+# ============ Temporal Grounding Functions ============
+
+def parse_temporal(text_or_tuple):
+    """
+    Parses temporal interval from string or returns directly if already a tuple/list.
+    Returns tuple (start, end) or None if invalid.
+    
+    Supported formats:
+    - "(1.5, 3.2)" or "[1.5, 3.2]"
+    - "1.5 - 3.2" or "1.5 to 3.2"
+    - "from 1.5 to 3.2 seconds"
+    - Already a tuple/list: (1.5, 3.2)
+    """
+    # If it's already a list or tuple of 2 numbers, return it directly
+    if isinstance(text_or_tuple, (tuple, list)) and len(text_or_tuple) == 2:
+        try:
+            start, end = map(float, text_or_tuple)
+            return (start, end)
+        except (TypeError, ValueError):
+            return None
+
+    # Otherwise treat as string and attempt to parse
+    if not isinstance(text_or_tuple, str):
+        return None
+
+    text = text_or_tuple.lower().strip()
+    
+    # Try various patterns
+    patterns = [
+        # [1.5, 3.2] or (1.5, 3.2)
+        r"[\[\(]\s*(-?\d+\.?\d*)\s*[,;]\s*(-?\d+\.?\d*)\s*[\]\)]",
+        # 1.5 - 3.2 or 1.5-3.2
+        r"(-?\d+\.?\d*)\s*[-–—]\s*(-?\d+\.?\d*)",
+        # 1.5 to 3.2 or from 1.5 to 3.2
+        r"(?:from\s+)?(-?\d+\.?\d*)\s*to\s*(-?\d+\.?\d*)",
+        # start: 1.5, end: 3.2 or start=1.5, end=3.2
+        r"start[:\s=]+(-?\d+\.?\d*).*?end[:\s=]+(-?\d+\.?\d*)",
+    ]
+    
+    for pattern in patterns:
+        match = re.search(pattern, text)
+        if match:
+            try:
+                start, end = float(match.group(1)), float(match.group(2))
+                return (start, end)
+            except (ValueError, TypeError):
+                continue
+    
+    return None
 
 
-# ------------------------------------------------------------
-# import math
+def reward_temporal_iou(pred_interval, gt_interval):
+    """
+    Temporal IoU (tIoU) for 1D intervals.
+    Returns 0 to 1 score where 1 = perfect overlap.
+    """
+    if pred_interval is None or gt_interval is None:
+        return 0.0
 
-# def match_answer(response):
-#     is_matched = False
-#     ans_marker = 'The answer is: '
-#     ans_idx = response.lower().rfind(ans_marker)
-#     if ans_idx != -1:
-#         is_matched = True
-#         response = response[ans_idx + len(ans_marker):].strip()
-#         if response.endswith("\n"):
-#             response = response[:-2]
+    start1, end1 = pred_interval
+    start2, end2 = gt_interval
 
-#     ans_marker = 'answer:\n'
-#     ans_idx = response.lower().rfind(ans_marker)
-#     if ans_idx != -1:
-#         is_matched = True
-#         response = response[ans_idx + len(ans_marker):].strip()
-#         if response.endswith("\n"):
-#             response = response[:-2]
+    # Ensure start <= end
+    if start1 > end1 or start2 > end2:
+        return 0.0
 
-#     ans_marker = 'answer: '
-#     ans_idx = response.lower().rfind(ans_marker)
-#     if ans_idx != -1:
-#         is_matched = True
-#         response = response[ans_idx + len(ans_marker):].strip()
-#         if response.endswith("\n"):
-#             response = response[:-2]
+    # Calculate intersection
+    inter_start = max(start1, start2)
+    inter_end = min(end1, end2)
+    intersection = max(0, inter_end - inter_start)
 
-#     # Find boxed
-#     ans_boxed = _last_boxed_only_string(response)
-#     if ans_boxed:
-#         is_matched = True
-#         response = ans_boxed
+    # Calculate union
+    duration1 = end1 - start1
+    duration2 = end2 - start2
+    union = duration1 + duration2 - intersection
 
-#     # Grade
-#     return is_matched, response
+    if union <= 0:
+        return 0.0
+
+    return intersection / union
 
 
-# def _last_boxed_only_string(string):
-#     idx = string.rfind("\\boxed")
-#     if idx < 0:
-#         idx = string.rfind("\\fbox")
-#         if idx < 0:
-#             return None
+def qwen_reward_fn_temporal(generated_text, golden_answer):
+    """
+    Reward function for temporal grounding tasks.
+    Handles both string and tuple/list formats for input.
+    Returns tIoU score (0 to 1).
+    """
+    pred_interval = parse_temporal(generated_text)
+    gt_interval = parse_temporal(golden_answer)
 
-#     i = idx
-#     left_brace_idx = None
-#     right_brace_idx = None
-#     num_left_braces_open = 0
-#     while i < len(string):
-#         if string[i] == "{":
-#             num_left_braces_open += 1
-#             if left_brace_idx is None:
-#                 left_brace_idx = i
-#         elif string[i] == "}":
-#             num_left_braces_open -= 1
-#             if num_left_braces_open == 0:
-#                 right_brace_idx = i
-#                 break
+    return reward_temporal_iou(pred_interval, gt_interval)
 
-#         i += 1
 
-#     if left_brace_idx is None or right_brace_idx is None:
-#         return None
-
-#     return string[left_brace_idx + 1: right_brace_idx].strip()
-
-# def qwen_reward_fn(generated_text, golden_answer, task="math"):
-#     if golden_answer in ["A", "B", "C", "D"]:
-#         task = "gpqa"
-#         model_answer = extract_answer(generated_text, task)
-#         accuracy = 1.0 if grade_answer(model_answer, golden_answer) else 0.0 #-0.5
-#         # if "boxed" not in generated_text:
-#         #     accuracy = -1.0
-#         return accuracy
-
-#     answer = golden_answer.lstrip('0') 
-#     is_matched, model_output = match_answer(generated_text)
-#     model_output = model_output.strip("The final answer is ").strip(". I hope it is correct.")
-#     try:
-#         if "\pi" in model_output or "\pi" in golden_answer:
-#             equivs = []
-#             for pi in [math.pi, 3.14]:
-#                 equivs.append(math_equal(model_output, answer, timeout=True, pi=pi))
-#             equiv = any(equivs)
-#         else:
-#             equiv = math_equal(model_output, answer, timeout=True)
-#     except:
-#         equiv = False
-
-#     if equiv:
-#         return 1.0
-#     else:
-#         return 0.0
-
-# ------------------------------------------------------------
+# ============ End Temporal Grounding Functions ============
 
 def majority_vote(
     solutions: List[str],

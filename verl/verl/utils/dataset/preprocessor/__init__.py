@@ -33,8 +33,8 @@ def map_processor_to_preprocessor(processor:AutoProcessor):
     processor_name = processor.__class__.__name__
     if not processor_name.lower().endswith("processor"):
         raise ValueError(f"Source object '{processor_name}' is not a 'Processor'.")
-    if re.match("Qwen2.*?VLProcessor", processor_name):
-        print("QwenVL2 Series will use the QwenVLPreprocessor")
+    if re.match("Qwen[23].*?VLProcessor", processor_name):
+        print("QwenVL2/3 Series will use the QwenVLPreprocessor")
         dest_name = "QwenVLPreprocessor".lower()
     else:
         dest_name = processor_name.lower().replace("processor", "preprocessor")

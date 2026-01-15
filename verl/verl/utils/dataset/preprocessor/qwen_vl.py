@@ -35,7 +35,9 @@ MAX_PIXELS = 16384 * 28 * 28
 MAX_RATIO = 200
 
 VIDEO_MIN_PIXELS = 128 * 28 * 28
-VIDEO_TOTAL_PIXELS = int(float(os.environ.get('VIDEO_MAX_PIXELS', 128000 * 28 * 28 * 0.9)))
+VIDEO_TOTAL_PIXELS = int(
+    float(os.environ.get("VIDEO_MAX_PIXELS", 128000 * 28 * 28 * 0.9))
+)
 
 VIDEO_FORMAT_HELP = """Currently, we only support the video formats introduced in qwen2-vl.
 Refer to https://github.com/QwenLM/Qwen2.5-VL?tab=readme-ov-file#using---transformers-to-chat.
@@ -63,6 +65,8 @@ eg.
     "max_frames": 32
 }
 """
+
+
 @PREPROCESSOR_REGISTER.register()
 class QwenVLPreProcessor(BasicPreprocessor):
     def __init__(self, processor, image_key="image", video_key="video", **kwargs):
@@ -72,7 +76,7 @@ class QwenVLPreProcessor(BasicPreprocessor):
         self.factor = kwargs.get("factor", IMAGE_FACTOR)
         self.video_min_pixels = kwargs.get("video_min_pixels", VIDEO_MIN_PIXELS)
         self.video_total_pixels = kwargs.get("video_total_pixels", VIDEO_TOTAL_PIXELS)
-    
+
     def process_image(self, image, **kwargs) -> torch.Tensor:
         if isinstance(image, Image.Image):
             return image.convert("RGB")
@@ -86,9 +90,10 @@ class QwenVLPreProcessor(BasicPreprocessor):
         image["min_pixels"] = min_pixels
         image = fetch_image(image, size_factor=factor)
         return image
+
     def process_audio(self, audio, **kwargs):
         raise ValueError("QwenVL series does not support audio input")
-    
+
     def process_video(self, video, **kwargs) -> torch.Tensor:
         """Converts a video dict into a [n_frames, 3, H, W] tensor
 
@@ -96,8 +101,8 @@ class QwenVLPreProcessor(BasicPreprocessor):
         """
         nframes = kwargs.get("nframes", None)
         fps = kwargs.get("fps", None)
-        fps_min_frames = kwargs.get("fps_min_frames", None),
-        fps_max_frames = kwargs.get("fps_max_frames", None),
+        fps_min_frames = (kwargs.get("fps_min_frames", None),)
+        fps_max_frames = (kwargs.get("fps_max_frames", None),)
         if not isinstance(video, dict) or "video" not in video:
             raise NotImplementedError(VIDEO_FORMAT_HELP)
         assert nframes is None or fps is None, "Can't use both `nframes` or `fps`"
@@ -121,4 +126,8 @@ class QwenVLPreProcessor(BasicPreprocessor):
         video["min_pixels"] = video_min_pixels
         return_video_sample_fps = kwargs.get("return_video_sample_fps", False)
         image_factor = kwargs.get("image_factor", self.factor)
-        return fetch_video(video, image_factor=image_factor, return_video_sample_fps=return_video_sample_fps)
+        return fetch_video(
+            video,
+            image_patch_size=image_factor,
+            return_video_sample_fps=return_video_sample_fps,
+        )
