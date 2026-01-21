@@ -1,75 +1,107 @@
-#!/usr/bin/env python3
-"""Generate training/test examples from EGO4D pickle for TTRL."""
-import pickle
 import json
+import pickle
 
 VIDEO_BASE = "/dais/fs/scratch/dduka/databases/ego4d/video_320px_15sec"
 PICKLE_PATH = "/dais/fs/scratch/dduka/databases/ego4d/ego4d_train.pkl"
-CHUNK_DURATION = 15  # seconds per chunk
-CONTEXT_PADDING = 10  # seconds of context before/after action
+CHUNK_DURATION = 15
+PROMPT_TEMPLATE = """TASK: Temporal localization in egocentric video.
 
-PROMPT_TEMPLATE = """<video>
-TASK: Locate when "{caption}" occurs in this video.
+    ACTION TO LOCATE: "{caption}"
 
-HINT: The action might be near {seed_start:.1f}s to {seed_end:.1f}s.
+    SEED WINDOW (approximate): {seed_start:.2f}s to {seed_end:.2f}s (use as starting point only, may be inaccurate).
 
-OUTPUT FORMAT: [start_seconds, end_seconds]
-Example: [2.5, 4.8]
+    ANALYSIS STEPS:
+    1. Watch the video and identify the camera wearer's hands throughout.
+    2. Find when the described action STARTS: the exact moment of first intentional movement toward the action (hand reaches, begins grasp, or object starts moving due to wearer).
+    3. Find when the action ENDS: the exact moment the action goal is achieved (object released/placed, hands withdraw, result is stable).
 
-Your answer:"""
+    VISUAL CUES TO TRACK:
+    - Hand position and motion relative to target objects
+    - Object state changes (picked up, moved, opened, closed, placed)
+    - Contact events (hand touches object, object touches surface)
+    - Motion ends (object comes to rest, hand stops moving)
+
+    CRITICAL RULES:
+    - Boundaries must be TIGHT: start at first evidence of action, end when action completes
+    - Do NOT include preparation or aftermath unless part of the described action
+    - If action spans multiple sub-actions, include the full sequence
+    - Times are relative to video start (0.0s = first frame)
+
+    OUTPUT FORMAT: [start_seconds, end_seconds]
+    Times should be relative to the start of the first video segment.
+    Example: [2.5, 18.8]
+
+    Your answer:
+"""
 
 
-def get_chunk_paths(video_id, start_time, end_time):
-    """Get all 15-second chunk video paths covering start-10s to end+10s."""
-    context_start = max(0, start_time - CONTEXT_PADDING)
-    context_end = end_time + CONTEXT_PADDING
+def get_chunk_paths(video_id: str, start_time: float, end_time: float):
+    """Get all 15-second chunk video paths covering start-padding to end+padding.
 
-    start_chunk = int(context_start // CHUNK_DURATION)
-    end_chunk = int(context_end // CHUNK_DURATION)
+    Args:
+        video_id: EGO4D video identifier
+        start_time: Action start time in seconds
+        end_time: Action end time in seconds
 
-    # Return list of video dicts in Qwen VL format
+    Returns:
+        Tuple of (list of video dicts, context_start_time)
+    """
+    context_start = start_time
+    context_end = end_time
+
+    start_chunk_idx = int(context_start // CHUNK_DURATION)
+    end_chunk_idx = int(context_end // CHUNK_DURATION)
+
     chunks = []
-    for chunk_idx in range(start_chunk, end_chunk + 1):
+    for chunk_idx in range(start_chunk_idx, end_chunk_idx + 1):
         chunk_start_time = chunk_idx * CHUNK_DURATION
-        chunk_path = f"file://{VIDEO_BASE}/grp-{video_id}.mp4/{chunk_start_time}.mp4"
-        chunks.append({"video": chunk_path, "nframes": 32})
-        break
+        chunk_path = f"file://{VIDEO_BASE}/{video_id}.mp4/{chunk_start_time}.mp4"
+        chunks.append(chunk_path)
 
-    return chunks, context_start
+    # context_start is the time offset from the first chunk's start
+    first_chunk_start = start_chunk_idx * CHUNK_DURATION
+    return chunks, first_chunk_start
 
 
 def process_items(items, start_idx=0):
-    """Convert list of items to format expected by TTRL training."""
+    """Convert list of items to format expected by TTRL training.
+
+    Args:
+        items: List of (video_id, start, end, caption) tuples
+        start_idx: Starting index for extra_info
+
+    Returns:
+        List of training data dicts
+
+    """
     training_data = []
     for idx, item in enumerate(items):
         video_id, start, end, caption = item
         start, end = float(start), float(end)
 
-        chunks, context_start = get_chunk_paths(video_id, start, end)
+        chunks, first_chunk_start = get_chunk_paths(video_id, start, end)
 
-        # Timestamps relative to context window
-        rel_start = start - context_start
-        rel_end = end - context_start
+        if len(chunks) == 0:
+            print(f"Warning: No chunks found for video_id={video_id}, skipping")
+            continue
 
-        prompt_text = PROMPT_TEMPLATE.format(
-            caption=caption, seed_start=rel_start, seed_end=rel_end
-        )
+        # Timestamps relative to first chunk start
+        rel_start = start - first_chunk_start
+        rel_end = end - first_chunk_start
 
-        # Format matching tag/train.json structure:
-        # - "prompt": list of chat messages (Qwen format)
-        # - "videos": list of video dicts with "video" and "nframes" keys
-        # - "answer": ground truth in [start, end] format
-        # - "data_source": "EGO4D" (maps to "tag" task in ttrl.py)
-        # - "reward_model": dict with style and ground_truth
-        # - "extra_info": metadata including index and video_id
+        assert rel_start >= 0 and rel_end >= 0 and rel_start < rel_end
+
+        # This has to be a simple dict as follows
         training_data.append(
             {
-                "prompt": [{"role": "user", "content": prompt_text}],
-                "videos": chunks,
-                "answer": "[0, 0]",  # Placeholder - actual ground truth would go here
-                "data_source": "EGO4D",
-                "reward_model": {"style": "rule", "ground_truth": "[0, 0]"},
-                "extra_info": {"index": start_idx + idx, "video_id": video_id},
+                "prompt": "".join(["<video>"] * len(chunks))
+                + PROMPT_TEMPLATE.format(
+                    caption=caption, seed_start=rel_start, seed_end=rel_end
+                ),
+                "video_paths": chunks,
+                "answer": [0.0, 0.0],
+                "source": "dduka",
+                "id": idx,
             }
         )
 
@@ -80,7 +112,6 @@ def main():
     with open(PICKLE_PATH, "rb") as f:
         data = pickle.load(f)
 
-    # Train: first 10 items, Test: items 100-110 (different samples)
     train_items = data[:10]
     test_items = data[100:110]
 
