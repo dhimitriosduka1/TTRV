@@ -75,16 +75,12 @@ def compute_temporal_metrics(solutions: List[str], model_answers: List[str]):
 
 
 def test_time_train_metrics(
-    solutions: List[str], ground_truth: List[str], task="math", extra_info=None
+    solutions: List[str], ground_truth: List[str] = None, task="math", extra_info=None
 ):
-
-    assert len(solutions) == len(
-        ground_truth
-    ), f"{len(solutions)} vs {len(ground_truth)}"
-
-    assert len(set(ground_truth)) == 1, f"Ground truth is not unique: {ground_truth}"
-    ground_truth = ground_truth[0]
-
+    """
+    Compute TTRL metrics using self-consistency (no ground truth required).
+    Ground truth parameter is kept for API compatibility but not used.
+    """
     model_answers = auto_extract(task, solutions, extra_info=extra_info)
     counter = Counter(model_answers)
     total = len(model_answers)
@@ -103,39 +99,18 @@ def test_time_train_metrics(
         normalized_entropy = 0.0
 
     estimated_label, majority_count = counter.most_common(1)[0]
-
-    hit_rate = (
-        1.0
-        if auto_verify(task, [estimated_label], [ground_truth], extra_info=extra_info)[
-            0
-        ][0]
-        else 0.0
-    )
     majority_ratio = majority_count / len(solutions)
 
     rewards, _ = auto_verify(
         task, solutions, [estimated_label] * len(solutions), extra_info=extra_info
     )
-    true_rewards, _ = auto_verify(
-        task, solutions, [ground_truth] * len(solutions), extra_info=extra_info
-    )
     rewards_en = [(r * 1) - (0.75 * normalized_entropy) for r in reward_p]
-
-    rewards_hit_rate = 0
-    for reward, true_reward in zip(rewards, true_rewards):
-        if reward == true_reward:
-            rewards_hit_rate += 1
-    rewards_hit_rate = rewards_hit_rate / len(rewards)
 
     assert len(rewards) == len(solutions), f"{len(rewards)} vs {len(solutions)}"
 
     ttrl_metrics = {
-        "label_accuracy": hit_rate,
-        "reward_accuracy": rewards_hit_rate,
         "majority_ratio": majority_ratio,
-        "ground_truth_ratio": sum(true_rewards) / len(true_rewards),
         "majority_voting_reward": sum(rewards) / len(rewards),
-        f"pass@{len(solutions)}": 1.0 if sum(true_rewards) >= 1 else 0.0,
         "normalized_entropy": normalized_entropy,
     }
 
