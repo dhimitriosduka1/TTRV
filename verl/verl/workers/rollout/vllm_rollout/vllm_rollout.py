@@ -56,6 +56,17 @@ def _pre_process_inputs(pad_token_id, prompt_token_ids: torch.Tensor) -> List[in
     token_ids = prompt_token_ids[non_pad_index:].tolist()
     return token_ids
 
+# Source [Dhimitrios]: https://github.com/volcengine/verl/pull/4810/files
+def get_max_position_embeddings(hf_config) -> int:
+    max_len = getattr(hf_config, "max_position_embeddings", None)
+    if max_len is None:
+        text_config = getattr(hf_config, "text_config", None)
+        if text_config is not None:
+            max_len = getattr(text_config, "max_position_embeddings", None)
+
+    if max_len is None:
+        raise ValueError("max_position_embeddings not found in HFModelConfig!")
+    return int(max_len)
 
 class vLLMRollout(BaseRollout):
     def __init__(self, actor_module: nn.Module, config: DictConfig, tokenizer, model_hf_config, **kwargs):
@@ -93,7 +104,7 @@ class vLLMRollout(BaseRollout):
                     tensor_model_parallel_size=tensor_parallel_size, num_tp_per_train_tp=num_tp_per_train_tp
                 )
 
-        assert model_hf_config.max_position_embeddings >= config.prompt_length + config.response_length, (
+        assert get_max_position_embeddings(model_hf_config) >= config.prompt_length + config.response_length, (
             "model context length should be greater than total sequence length"
         )
 

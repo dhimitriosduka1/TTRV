@@ -146,6 +146,23 @@ def apply_monkey_patch(model: PreTrainedModel, ulysses_sp_size: int):
         print("Monkey patch FlashAttention2.forward in Qwen2VL")
         return
 
+    elif model.config.model_type in ("qwen3_vl", "qwen3_vl_moe"):
+        # Qwen3-VL support - patch model forward functions
+        from transformers.models.qwen3_vl.modeling_qwen3_vl import (
+            Qwen3VLForConditionalGeneration,
+            Qwen3VLModel,
+        )
+
+        from verl.models.transformers.qwen3_vl import (
+            forward_with_normal_backend,
+            qwen3_vl_base_forward,
+        )
+
+        Qwen3VLModel.forward = qwen3_vl_base_forward
+        Qwen3VLForConditionalGeneration.forward = forward_with_normal_backend
+        print(f"Monkey patch {model.__class__.__name__} model forward for Qwen3-VL")
+        return
+
     # transformers<=4.47.1
     if hasattr(module, "_flash_attention_forward"):
         module._flash_attention_forward = _ulysses_flash_attention_forward

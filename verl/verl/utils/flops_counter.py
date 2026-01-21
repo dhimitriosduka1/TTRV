@@ -15,7 +15,7 @@
 import torch
 from transformers import PretrainedConfig
 
-VALID_CONFIG_TYPE = {"llama", "qwen2", "qwen2_vl", "qwen2_5_vl", "deepseek_v3"}
+VALID_CONFIG_TYPE = {"llama", "qwen2", "qwen2_vl", "qwen2_5_vl", "deepseek_v3", "qwen3_vl"}
 
 
 def get_device_flops(unit="T"):
@@ -73,8 +73,52 @@ class FlopsCounter:
             "qwen2_vl": self._estimate_qwen2_flops,
             "qwen2_5_vl": self._estimate_qwen2_flops,
             "deepseek_v3": self._estimate_deepseek_v3_flops,
+            "qwen3_vl": self._estimate_qwen3_vl_flops,
         }
         self.config = config
+
+    def _estimate_qwen3_vl_flops(config, tokens_sum, batch_seqlens, delta_time, **kargs):
+        # qwen3_vl uses text_config and vision_config to distinguish configs of different parts.
+        hidden_size = config.text_config.hidden_size
+        vocab_size = config.text_config.vocab_size
+        num_hidden_layers = config.text_config.num_hidden_layers
+        num_key_value_heads = config.text_config.num_key_value_heads
+        num_attention_heads = config.text_config.num_attention_heads
+        intermediate_size = config.text_config.intermediate_size
+
+        head_dim = hidden_size // num_attention_heads
+        q_size = num_attention_heads * head_dim
+        k_size = num_key_value_heads * head_dim
+        v_size = num_key_value_heads * head_dim
+
+        # non-attn per layer parm
+        mlp_N = hidden_size * intermediate_size * 3
+        attn_linear_N = hidden_size * (q_size + k_size + v_size + num_attention_heads * head_dim)
+        emd_and_lm_head_N = vocab_size * hidden_size * 2
+        # non-attn all_layer parm
+        dense_N = (mlp_N + attn_linear_N) * num_hidden_layers + emd_and_lm_head_N
+        # non-attn all_layer & all_token fwd & bwd flops
+        dense_N_flops = 6 * dense_N * tokens_sum
+
+        # qwen3_vl uses deepstack to merge visual embeds and text embeds, but it has no tensor operation.
+
+        # attn all_layer & all_token fwd & bwd flops
+        seqlen_square_sum = 0
+        for seqlen in batch_seqlens:
+            seqlen_square_sum += seqlen * seqlen
+        attn_qkv_flops = 6 * seqlen_square_sum * head_dim * num_attention_heads * num_hidden_layers
+
+        # vit flops
+        images_seqlens = kargs.get("images_seqlens", None)
+        if images_seqlens is not None:
+            vit_flops = _estimate_qwen3_vit_flop(images_seqlens, config.vision_config)
+        else:
+            vit_flops = 0
+
+        # all_layer & all_token fwd & bwd flops
+        flops_all_token = dense_N_flops + attn_qkv_flops + vit_flops
+        flops_achieved = flops_all_token * (1.0 / delta_time) / 1e12
+        return flops_achieved
 
     def _estimate_unknown_flops(self, tokens_sum, batch_seqlens, delta_time):
         return 0
