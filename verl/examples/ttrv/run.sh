@@ -1,4 +1,28 @@
-#!/bin/bash
+#!/bin/bash -l
+
+#SBATCH -o /dais/fs/scratch/dduka/logs/verl/verl_%N.out
+#SBATCH -e /dais/fs/scratch/dduka/logs/verl/verl_%N.err
+
+#SBATCH -J verl
+#SBATCH --time=00:59:59
+
+#SBATCH --nodes=1
+#SBATCH --partition="gpu1"
+#SBATCH --cpus-per-task=48
+#SBATCH --threads-per-core=1
+
+#SBATCH --gres=gpu:h200:4
+#SBATCH --ntasks-per-node=1
+#SBATCH --mem=1000000
+
+micromamba activate verl
+module load cuda/12.8
+module load gcc/14
+
+cd /u/dduka/project/RL/TTRV/verl
+
+export PYTHONPATH=$PYTHONPATH:/u/dduka/project/RL/TTRV/verl
+
 #export VLLM_ATTENTION_BACKEND=XFORMERS
 # ray stop
 unset VLLM_ATTENTION_BACKEND
@@ -10,10 +34,8 @@ mkdir -p logs
 DATE=$(date +%m%d)
 TIME_TAG=$(date +%H%M%S)
 
-
-
-TASK="dtd_20"                       # put the dataset folder name here
-NO_GPU=8
+TASK="dtd_20"
+NO_GPU=4
 EPISODE=2
 ADVANTAGE="grpo"
 
@@ -28,16 +50,15 @@ fi
 
 N=1 #greedy
 
-
 DATA_TRAIN_BATCH_SIZE=$NO_GPU
 N_VOTES_PER_PROMPT=32
 N_SAMPLES_PER_PROMPT=16
 MINI_BATCH_SIZE=1
 MICRO_BATCH_SIZE=2
 
-DATA_LOCAL_DIR="path/to/data/verl/data" # change this to your local data directory
+DATA_LOCAL_DIR="/u/dduka/project/RL/TTRV/verl/data" # change this to your local data directory
 
-BACKBONE_PATH="OpenGVLab/InternVL3-2B"
+BACKBONE_PATH="Qwen/Qwen3-VL-8B-Instruct"
 
 MODEL="${TASK}-${BACKBONE}"
 EXPERIMENT="TTRL-Len@${K}k"
@@ -53,7 +74,7 @@ LOG_FILE="logs/${TASK}_${BACKBONE_SAFE}_${EPISODE}e_${DATE}_${TIME_TAG}.log" # l
 
 # see do_sample
 # ------------------------------------------------------------
-python -m verl.trainer.main_ppo \
+python verl/trainer/main_ppo.py \
   reward_model.reward_manager=ttrl \
   reward_model.reward_kwargs.n_samples_per_prompt=$N_SAMPLES_PER_PROMPT \
   reward_model.reward_kwargs.n_votes_per_prompt=$N_VOTES_PER_PROMPT \
