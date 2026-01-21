@@ -34,7 +34,7 @@ mkdir -p logs
 DATE=$(date +%m%d)
 TIME_TAG=$(date +%H%M%S)
 
-TASK="dtd_20"
+TASK="tag"
 NO_GPU=4
 EPISODE=2
 ADVANTAGE="grpo"
@@ -114,8 +114,8 @@ python verl/trainer/main_ppo.py \
   actor_rollout_ref.rollout.val_kwargs.n=$N \
   actor_rollout_ref.rollout.val_kwargs.top_p=0.95 \
   actor_rollout_ref.rollout.val_kwargs.temperature=0.0 \
-  actor_rollout_ref.rollout.max_model_len=$((MAX_PROMPT_LENGTH + MAX_RESPONSE_LENGTH)) \
-  actor_rollout_ref.rollout.max_num_batched_tokens=$((MAX_PROMPT_LENGTH + MAX_RESPONSE_LENGTH)) \
+  actor_rollout_ref.rollout.max_model_len=16384 \
+  actor_rollout_ref.rollout.max_num_batched_tokens=16384 \
   critic.optim.lr=9e-6 \
   critic.model.use_remove_padding=True \
   critic.model.path=$BACKBONE_PATH \

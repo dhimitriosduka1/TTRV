@@ -120,6 +120,7 @@ class QwenVLPreProcessor(BasicPreprocessor):
                     video["min_frames"] = fps_min_frames
                 if fps_max_frames is not None:
                     video["max_frames"] = fps_max_frames
+
         video_total_pixels = kwargs.get("video_total_pixels", self.video_total_pixels)
         video_min_pixels = kwargs.get("video_min_pixels", self.video_min_pixels)
         video["total_pixels"] = video_total_pixels
