@@ -54,7 +54,7 @@ eg.
 {
     "type": "video",
     "video": "file:///path/to/video.mp4"
-}
+}   
 # Defaults to fps=2, min_frames=4, max_frames=768
 
 {
@@ -130,4 +130,5 @@ class QwenVLPreProcessor(BasicPreprocessor):
             video,
             image_patch_size=image_factor,
             return_video_sample_fps=return_video_sample_fps,
+            return_video_metadata=True,
         )

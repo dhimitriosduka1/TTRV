@@ -43,9 +43,30 @@ class BasicPreprocessor:
 
         videos = None
         if self.video_key in row_dict:
-            videos = [self.process_video(video) for video in row_dict.pop(self.video_key)]
-            multi_modal_data["video"] = [video.numpy() for video in videos]
-        model_inputs = self.processor(text=[raw_prompt], images=images, videos=videos, return_tensors="pt")
+            processed_videos = [
+                self.process_video(video) for video in row_dict.pop(self.video_key)
+            ]
+
+            # Handle both tensor and (tensor, metadata) tuple returns from process_video
+            # vLLM expects (video_array, metadata) tuples for Qwen3-VL to access frame timing info
+            videos = []
+            video_tuples_for_vllm = []
+            for video in processed_videos:
+                if isinstance(video, tuple):
+                    # fetch_video returns (video_tensor, metadata) when return_video_metadata=True
+                    video_tensor, metadata = video
+                    videos.append(video_tensor)
+                    # Store (numpy_array, metadata) tuple for vLLM
+                    video_tuples_for_vllm.append((video_tensor.numpy(), metadata))
+                else:
+                    videos.append(video)
+                    # No metadata available, create minimal metadata for vLLM
+                    video_tuples_for_vllm.append((video.numpy(), None))
+
+            multi_modal_data["video"] = video_tuples_for_vllm
+        model_inputs = self.processor(
+            text=[raw_prompt], images=images, videos=videos, return_tensors="pt"
+        )
         input_ids = model_inputs.pop("input_ids")
         attention_mask = model_inputs.pop("attention_mask")
 

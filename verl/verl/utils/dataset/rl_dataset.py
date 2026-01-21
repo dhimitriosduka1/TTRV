@@ -234,7 +234,25 @@ class RLHFDataset(Dataset):
             truncation=self.truncation,
         )
 
-        if self.processor is not None and "Qwen2VLImageProcessor" in self.processor.image_processor.__class__.__name__:
+        # Check for Qwen3-VL first (Priority)
+        if self.processor is not None and "Qwen3VL" in self.processor.__class__.__name__:
+            from verl.models.transformers.qwen3_vl import get_rope_index
+
+            position_ids = [
+                get_rope_index(
+                    self.processor,
+                    input_ids=input_ids[0],
+                    image_grid_thw=model_inputs.get("image_grid_thw"),
+                    video_grid_thw=model_inputs.get("video_grid_thw"),
+                    attention_mask=attention_mask[0],
+                    second_per_grid_ts=model_inputs.get("second_per_grid_ts"),
+                )
+            ]
+
+        # Then check for Qwen2-VL (Fallback)
+        # Note: We check the image processor here because Qwen2 uses Qwen2VLImageProcessor
+        # BUT Qwen3 also uses it, so this must stay as an ELIF after the Qwen3 check.
+        elif self.processor is not None and "Qwen2VLImageProcessor" in self.processor.image_processor.__class__.__name__:
             from verl.models.transformers.qwen2_vl import get_rope_index
 
             position_ids = [
