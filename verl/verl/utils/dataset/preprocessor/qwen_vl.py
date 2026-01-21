@@ -88,7 +88,7 @@ class QwenVLPreProcessor(BasicPreprocessor):
             image["image"] = BytesIO(image["bytes"])
         image["max_pixels"] = max_pixels
         image["min_pixels"] = min_pixels
-        image = fetch_image(image, size_factor=factor)
+        image = fetch_image(ele=image, image_patch_size=factor)
         return image
 
     def process_audio(self, audio, **kwargs):
