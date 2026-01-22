@@ -4,7 +4,7 @@
 #SBATCH -e /dais/fs/scratch/dduka/logs/verl/verl_standard.err
 
 #SBATCH -J verl_standard
-#SBATCH --time=01:59:59
+#SBATCH --time=23:59:59
 
 #SBATCH --nodes=1
 #SBATCH --partition="gpu1"
@@ -15,7 +15,7 @@
 #SBATCH --ntasks-per-node=1
 #SBATCH --mem=1000000
 
-# #SBATCH --array=0-2%1
+#SBATCH --array=0-4%1
 
 micromamba activate verl
 module load cuda/12.8
@@ -26,6 +26,7 @@ cd /u/dduka/project/RL/TTRV/verl
 unset VLLM_ATTENTION_BACKEND
 export VLLM_USE_V1=1
 export PYTHONPATH=$PYTHONPATH:/u/dduka/project/RL/TTRV/verl
+export RAY_TMPDIR=/dais/fs/scratch/dduka
 
 mkdir -p logs
 
@@ -42,11 +43,11 @@ MAX_RESPONSE_LENGTH=$((64 * 1))
 
 N=10 #This sets the number of samples generated during validation: 
 
-DATA_TRAIN_BATCH_SIZE=4 # Batch size
+DATA_TRAIN_BATCH_SIZE=32 # Batch size
 N_VOTES_PER_PROMPT=16 # Total responses generated per prompt
 N_SAMPLES_PER_PROMPT=10 # Number of responses kept for the PPO training: used in self._select_top_k_per_prompt(...)
-MINI_BATCH_SIZE=1
-MICRO_BATCH_SIZE=2
+MINI_BATCH_SIZE=16
+MICRO_BATCH_SIZE=4
 
 TRAIN_FILE="/u/dduka/project/RL/TTRV/verl/data/tag/standard/train.parquet"
 VAL_FILE="/u/dduka/project/RL/TTRV/verl/data/tag/standard/test.parquet"
@@ -121,7 +122,7 @@ python verl/trainer/main_ppo.py \
   trainer.experiment_name=$LOG_NAME \
   trainer.n_gpus_per_node=$NO_GPU \
   trainer.nnodes=1 \
-  trainer.val_before_train=False \
+  trainer.val_before_train=True \
   trainer.save_freq=200 \
   trainer.test_freq=200 \
   trainer.max_actor_ckpt_to_keep=3 \

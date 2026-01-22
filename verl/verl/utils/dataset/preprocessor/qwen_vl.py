@@ -100,7 +100,7 @@ class QwenVLPreProcessor(BasicPreprocessor):
         Add video sample FPS in a future MR
         """
         nframes = kwargs.get("nframes", None)
-        fps = kwargs.get("fps", None)
+        fps = kwargs.get("fps", 8)
         fps_min_frames = (kwargs.get("fps_min_frames", None),)
         fps_max_frames = (kwargs.get("fps_max_frames", None),)
         if not isinstance(video, dict) or "video" not in video:
