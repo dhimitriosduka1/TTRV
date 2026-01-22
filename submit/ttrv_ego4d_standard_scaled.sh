@@ -1,9 +1,9 @@
 #!/bin/bash -l
 
-#SBATCH -o /dais/fs/scratch/dduka/logs/verl/verl_standard.out
-#SBATCH -e /dais/fs/scratch/dduka/logs/verl/verl_standard.err
+#SBATCH -o /dais/fs/scratch/dduka/logs/verl/verl_scaled.out
+#SBATCH -e /dais/fs/scratch/dduka/logs/verl/verl_scaled.err
 
-#SBATCH -J verl_standard
+#SBATCH -J verl_scaled
 #SBATCH --time=23:59:59
 
 #SBATCH --nodes=1
@@ -42,21 +42,22 @@ MAX_RESPONSE_LENGTH=$((1024 * 1))
 
 N=10 #This sets the number of samples generated during validation: greedy
 
-DATA_TRAIN_BATCH_SIZE=16 # Batch size
-N_VOTES_PER_PROMPT=15 # Total responses generated per prompt
+DATA_TRAIN_BATCH_SIZE=4 # Batch size
+N_VOTES_PER_PROMPT=16 # Total responses generated per prompt
 N_SAMPLES_PER_PROMPT=10 # Number of responses kept for the PPO training: used in self._select_top_k_per_prompt(...)
-MINI_BATCH_SIZE=4
-MICRO_BATCH_SIZE=8
+MINI_BATCH_SIZE=1
+MICRO_BATCH_SIZE=2
 
-TRAIN_FILE="/u/dduka/project/RL/TTRV/verl/data/tag/standard/train.parquet"
-VAL_FILE="/u/dduka/project/RL/TTRV/verl/data/tag/standard/test.parquet"
+
+TRAIN_FILE="/u/dduka/project/RL/TTRV/verl/data/tag/scaled/train.parquet"
+VAL_FILE="/u/dduka/project/RL/TTRV/verl/data/tag/scaled/test.parquet"
 
 DATA_LOCAL_DIR="/u/dduka/project/RL/TTRV/verl/data"
 
 BACKBONE_PATH="Qwen/Qwen3-VL-8B-Instruct"
 
 MODEL="${TASK}-${BACKBONE_PATH}"
-EXPERIMENT="TTRL-EGO4D-TAR-ORIGINAL-SEGMENTS-TEST"
+EXPERIMENT="TTRL-EGO4D-TAR-SCALED-SEGMENTS"
 
 WANDB_PROJECT="TTRL-verl"
 LOG_NAME="${EXPERIMENT}-${MODEL}-${ADVANTAGE}"
