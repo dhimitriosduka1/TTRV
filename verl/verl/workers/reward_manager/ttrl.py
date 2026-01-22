@@ -230,11 +230,12 @@ class TTRLRewardManager:
             scores, dtype=torch.float32, device=data.batch["prompts"].device
         )
 
-        for k, v in all_ttrl_metrics.items():
-            if isinstance(v, list):
-                v = np.mean(v)
-                print(f"[{k}]", v)
-                ttrl_info[k] = v
+        # for k, v in all_ttrl_metrics.items():
+        #     if isinstance(v, list):
+        #         v = np.mean(v)
+        #         print(f"[{k}]", v)
+        #         ttrl_info[k] = v
+
         return reward_tensor, reward_extra_info, ttrl_info
 
     def _compute_eval_reward(self, data: DataProto):
