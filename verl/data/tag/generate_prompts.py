@@ -112,8 +112,8 @@ def main():
     with open(PICKLE_PATH, "rb") as f:
         data = pickle.load(f)
 
-    train_items = data[:10]
-    test_items = data[100:110]
+    train_items = data[:100_000]
+    test_items = data[100_000:101_000]
 
     train_data = process_items(train_items, start_idx=0)
     test_data = process_items(test_items, start_idx=0)

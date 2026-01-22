@@ -16,14 +16,13 @@ def make_map_fn(split):
             "reward_model": {"style": "rule", "ground_truth": example["answer"]},
             "extra_info": {
                 "split": split,
-                "index": f"{example.get("data_source", "EGO4D")}-{idx}",
+                "index": f"{example.get('data_source', 'EGO4D')}-{idx}",
             },
             "videos": [
                 {"video": path, "fps": DEFAULT_FPS, "max_pixels": DEFAULT_MAX_PIXELS}
                 for path in example["video_paths"]
             ],
         }
-        print(data)
         return data
 
     return process_fn
