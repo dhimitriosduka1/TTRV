@@ -36,9 +36,6 @@ class BasicPreprocessor:
         raise NotImplementedError("The process_video method must be implemented")
 
     def __call__(self, messages, row_dict):
-        print("&" * 100)
-        print(row_dict)
-        print("&" * 100)
         raw_prompt = self.processor.apply_chat_template(
             messages, add_generation_prompt=True, tokenize=False
         )
