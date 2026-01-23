@@ -1,7 +1,7 @@
 #!/bin/bash -l
 
-#SBATCH -o /dais/fs/scratch/dduka/logs/verl/verl_scaled.out
-#SBATCH -e /dais/fs/scratch/dduka/logs/verl/verl_scaled.err
+#SBATCH -o /dais/fs/scratch/dduka/logs/verl/verl_scaled_%A_%a.out
+#SBATCH -e /dais/fs/scratch/dduka/logs/verl/verl_scaled_%A_%a.err
 
 #SBATCH -J verl_scaled
 #SBATCH --time=23:59:59
@@ -15,7 +15,7 @@
 #SBATCH --ntasks-per-node=1
 #SBATCH --mem=1000000
 
-#SBATCH --array=0-4%1
+#SBATCH --array=0-10%1
 
 micromamba activate verl
 module load cuda/12.8
@@ -41,7 +41,7 @@ ADVANTAGE="grpo"
 MAX_PROMPT_LENGTH=7524
 MAX_RESPONSE_LENGTH=$((1024 * 1))
 
-N=10 #This sets the number of samples generated during validation: greedy
+N=4 #This sets the number of samples generated during validation: greedy
 
 DATA_TRAIN_BATCH_SIZE=32 # Batch size
 N_VOTES_PER_PROMPT=16 # Total responses generated per prompt
@@ -99,7 +99,7 @@ python verl/trainer/main_ppo.py \
   actor_rollout_ref.rollout.free_cache_engine=False \
   actor_rollout_ref.rollout.log_prob_micro_batch_size_per_gpu=$MICRO_BATCH_SIZE \
   actor_rollout_ref.rollout.tensor_model_parallel_size=1 \
-  actor_rollout_ref.rollout.gpu_memory_utilization=0.80 \
+  actor_rollout_ref.rollout.gpu_memory_utilization=0.65 \
   actor_rollout_ref.rollout.do_vote=True \
   actor_rollout_ref.rollout.n_vote=$N_VOTES_PER_PROMPT \
   actor_rollout_ref.rollout.n=$N_SAMPLES_PER_PROMPT \
@@ -123,7 +123,6 @@ python verl/trainer/main_ppo.py \
   trainer.experiment_name=$LOG_NAME \
   trainer.n_gpus_per_node=$NO_GPU \
   trainer.nnodes=1 \
-  trainer.val_before_train=True \
   trainer.save_freq=200 \
   trainer.test_freq=200 \
   trainer.max_actor_ckpt_to_keep=3 \

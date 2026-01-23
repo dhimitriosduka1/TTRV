@@ -1,7 +1,7 @@
 #!/bin/bash -l
 
-#SBATCH -o /dais/fs/scratch/dduka/logs/verl/verl_standard.out
-#SBATCH -e /dais/fs/scratch/dduka/logs/verl/verl_standard.err
+#SBATCH -o /dais/fs/scratch/dduka/logs/verl/verl_standard_%A_%a.out
+#SBATCH -e /dais/fs/scratch/dduka/logs/verl/verl_standard_%A_%a.err
 
 #SBATCH -J verl_standard
 #SBATCH --time=23:59:59
@@ -15,7 +15,7 @@
 #SBATCH --ntasks-per-node=1
 #SBATCH --mem=1000000
 
-#SBATCH --array=0-4%1
+#SBATCH --array=0-10%1
 
 micromamba activate verl
 module load cuda/12.8
@@ -41,7 +41,7 @@ ADVANTAGE="grpo"
 MAX_PROMPT_LENGTH=7524
 MAX_RESPONSE_LENGTH=$((64 * 1))
 
-N=10 #This sets the number of samples generated during validation: 
+N=4 #This sets the number of samples generated during validation: 
 
 DATA_TRAIN_BATCH_SIZE=32 # Batch size
 N_VOTES_PER_PROMPT=16 # Total responses generated per prompt
@@ -122,7 +122,6 @@ python verl/trainer/main_ppo.py \
   trainer.experiment_name=$LOG_NAME \
   trainer.n_gpus_per_node=$NO_GPU \
   trainer.nnodes=1 \
-  trainer.val_before_train=True \
   trainer.save_freq=200 \
   trainer.test_freq=200 \
   trainer.max_actor_ckpt_to_keep=3 \
