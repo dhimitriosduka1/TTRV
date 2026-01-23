@@ -2,13 +2,13 @@ import concurrent.futures
 from collections import Counter
 from typing import List
 
-from verl.utils.reward_score.ttrl.qwen.grader import \
-    math_equal as qwen_math_equal
+from verl.utils.reward_score.ttrl.qwen.grader import math_equal as qwen_math_equal
 from verl.utils.reward_score.ttrl.qwen.math_grade import grade_answer
 from verl.utils.reward_score.ttrl.qwen.qwen_math_parser import extract_answer
 
 import numpy as np
 import re
+
 
 def parse_bbox(text_or_bbox):
     """
@@ -52,9 +52,10 @@ def reward_spatial(pred_box, consensus_box):
     x1a, y1a, x2a, y2a = pred_box
     x1b, y1b, x2b, y2b = consensus_box
 
-    d1 = np.sqrt((x1a - x1b)**2 + (y1a - y1b)**2)
-    d2 = np.sqrt((x2a - x2b)**2 + (y2a - y2b)**2)
+    d1 = np.sqrt((x1a - x1b) ** 2 + (y1a - y1b) ** 2)
+    d2 = np.sqrt((x2a - x2b) ** 2 + (y2a - y2b) ** 2)
     return 1 / (1 + d1 + d2)  # Higher reward if closer
+
 
 def reward_iou(pred_box, consensus_box):
     if pred_box is None or consensus_box is None:
@@ -79,6 +80,7 @@ def reward_iou(pred_box, consensus_box):
 
     return iou
 
+
 def qwen_reward_fn_spatial(generated_text, golden_answer):
     """
     Reward function for bounding box prediction tasks.
@@ -90,9 +92,10 @@ def qwen_reward_fn_spatial(generated_text, golden_answer):
 
     return reward_iou(pred_box, consensus_box)
 
+
 def qwen_reward_fn(generated_text, golden_answer, task="math"):
     model_answer = extract_answer(generated_text, task)
-    accuracy = 1.0 if grade_answer(model_answer, golden_answer) else 0.0 #-0.5
+    accuracy = 1.0 if grade_answer(model_answer, golden_answer) else 0.0  # -0.5
     # if "boxed" not in generated_text:
     #     accuracy = -1.0
     return accuracy
@@ -100,18 +103,20 @@ def qwen_reward_fn(generated_text, golden_answer, task="math"):
 
 def qwen_reward_fn_gpqa(generated_text, golden_answer, task="gpqa"):
     model_answer = extract_answer(generated_text, task)
-    accuracy = 1.0 if grade_answer(model_answer, golden_answer) else 0.0 #-0.5
+    accuracy = 1.0 if grade_answer(model_answer, golden_answer) else 0.0  # -0.5
     # if "boxed" not in generated_text:
     #     accuracy = -1.0
     return accuracy
 
+
 # ============ Temporal Grounding Functions ============
+
 
 def parse_temporal(text_or_tuple):
     """
     Parses temporal interval from string or returns directly if already a tuple/list.
     Returns tuple (start, end) or None if invalid.
-    
+
     Supported formats:
     - "(1.5, 3.2)" or "[1.5, 3.2]"
     - "1.5 - 3.2" or "1.5 to 3.2"
@@ -131,7 +136,7 @@ def parse_temporal(text_or_tuple):
         return None
 
     text = text_or_tuple.lower().strip()
-    
+
     # Try various patterns
     patterns = [
         # [1.5, 3.2] or (1.5, 3.2)
@@ -143,7 +148,7 @@ def parse_temporal(text_or_tuple):
         # start: 1.5, end: 3.2 or start=1.5, end=3.2
         r"start[:\s=]+(-?\d+\.?\d*).*?end[:\s=]+(-?\d+\.?\d*)",
     ]
-    
+
     for pattern in patterns:
         match = re.search(pattern, text)
         if match:
@@ -152,7 +157,7 @@ def parse_temporal(text_or_tuple):
                 return (start, end)
             except (ValueError, TypeError):
                 continue
-    
+
     return None
 
 
@@ -201,36 +206,43 @@ def qwen_reward_fn_temporal(generated_text, golden_answer):
 
 # ============ End Temporal Grounding Functions ============
 
-def majority_vote(
-    solutions: List[str],
-    ground_truth: str,
-    task="math"
-):
-    model_answers = [extract_answer(generated_text, task) for generated_text in solutions]
+
+def majority_vote(solutions: List[str], ground_truth: str, task="math"):
+    model_answers = [
+        extract_answer(generated_text, task) for generated_text in solutions
+    ]
     model_answers = [answer for answer in model_answers if answer is not None]
 
     if len(model_answers) == 0:
         return 0
-    
+
     counter = Counter(model_answers)
-    
+
     majority_answer, _ = counter.most_common(1)[0]
     accuracy = 1.0 if grade_answer(majority_answer, ground_truth) else 0
     # if "boxed" not in generated_text:
     #     accuracy = -1.0
     return accuracy
 
+
 def qwen_math_equal_subprocess(prediction, reference, timeout_seconds=10):
     with concurrent.futures.ProcessPoolExecutor(max_workers=1) as executor:
-        future = executor.submit(qwen_math_equal, prediction=prediction, reference=reference, timeout=False)
+        future = executor.submit(
+            qwen_math_equal, prediction=prediction, reference=reference, timeout=False
+        )
         try:
             return future.result(timeout=timeout_seconds)
         except concurrent.futures.TimeoutError:
             return False
 
+
 def simplerl_reward_fn(generated_text, golden_answer):
     model_answer = extract_answer(generated_text, "math")
-    accuracy = 1.0 if qwen_math_equal_subprocess(prediction=model_answer, reference=golden_answer) else -0.5
+    accuracy = (
+        1.0
+        if qwen_math_equal_subprocess(prediction=model_answer, reference=golden_answer)
+        else -0.5
+    )
     if "boxed" not in generated_text:
         accuracy = -1.0
     return accuracy
