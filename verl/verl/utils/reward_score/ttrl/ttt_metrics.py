@@ -2,9 +2,82 @@ from collections import Counter
 from typing import List
 import math
 import numpy as np
+from sklearn.cluster import AgglomerativeClustering
 from verl.utils.reward_score.ttrl.auto_extract import auto_extract
 from verl.utils.reward_score.ttrl.auto_verify import auto_verify
-from collections import defaultdict
+from verl.utils.reward_score.ttrl.qwen.qwen_eval import (
+    parse_temporal,
+    reward_temporal_iou,
+)
+
+
+def compute_temporal_iou_distance_matrix(intervals):
+    """
+    Compute pairwise temporal IoU distance matrix.
+    Distance = 1 - IoU, so similar segments have low distance.
+
+    Args:
+        intervals: List of (start, end) tuples
+
+    Returns:
+        np.ndarray: Symmetric distance matrix of shape (n, n)
+    """
+    n = len(intervals)
+    dist_matrix = np.zeros((n, n))
+
+    for i in range(n):
+        for j in range(i + 1, n):
+            iou = reward_temporal_iou(intervals[i], intervals[j])
+            distance = 1.0 - iou
+            dist_matrix[i, j] = distance
+            dist_matrix[j, i] = distance
+
+    return dist_matrix
+
+
+def cluster_temporal_segments(model_answers, distance_threshold=0.1):
+    """
+    Cluster temporal segments based on IoU similarity using Agglomerative Clustering.
+
+    Args:
+        model_answers: List of temporal interval strings like "(start, end)"
+        distance_threshold: Maximum distance for merging clusters (1 - min_iou).
+                           Default 0.3 means segments with IoU >= 0.7 will be merged.
+
+    Returns:
+        tuple: (cluster_labels, parsed_intervals, valid_indices)
+            - cluster_labels: Array of cluster labels for valid intervals
+            - parsed_intervals: List of parsed (start, end) tuples
+            - valid_indices: List of original indices that had valid intervals
+    """
+    # Parse all intervals
+    parsed_intervals = []
+    valid_indices = []
+
+    for idx, ans in enumerate(model_answers):
+        interval = parse_temporal(ans)
+        if interval is not None and interval[0] <= interval[1]:
+            parsed_intervals.append(interval)
+            valid_indices.append(idx)
+
+    if len(parsed_intervals) == 0:
+        return np.array([]), [], []
+
+    if len(parsed_intervals) == 1:
+        # Only one valid interval, it's its own cluster
+        return np.array([0]), parsed_intervals, valid_indices
+
+    # Compute IoU distance matrix
+    dist_matrix = compute_temporal_iou_distance_matrix(parsed_intervals)
+
+    # Perform agglomerative clustering
+    clustering = AgglomerativeClustering(
+        distance_threshold=distance_threshold,
+        metric="precomputed",
+        linkage="average",
+    ).fit(dist_matrix)
+
+    return clustering.labels_, parsed_intervals, valid_indices
 
 
 def compute_temporal_metrics(solutions: List[str], model_answers: List[str]):
@@ -82,24 +155,81 @@ def test_time_train_metrics(
     Ground truth parameter is kept for API compatibility but not used.
     """
     model_answers = auto_extract(task, solutions, extra_info=extra_info)
-    counter = Counter(model_answers)
     total = len(model_answers)
-    reward_p = [counter[ans] / total for ans in model_answers]
 
-    entropy = 0.0
-    for count in counter.values():
-        probability = count / total
-        if probability > 0:  # Avoid log(0)
-            entropy -= probability * math.log(probability)
+    if task == "tag":
+        # Use IoU-based clustering for temporal segments
+        cluster_labels, parsed_intervals, valid_indices = cluster_temporal_segments(
+            model_answers, distance_threshold=0.1
+        )
 
-    if total > 1:
-        max_entropy = math.log(len(counter))  # Max entropy for this many unique answers
-        normalized_entropy = entropy / max_entropy if max_entropy > 0 else 0.0
+        if len(cluster_labels) == 0:
+            # No valid intervals, all get zero reward
+            reward_p = [0.0] * total
+            entropy = 0.0
+            normalized_entropy = 0.0
+            estimated_label = ""
+            majority_count = 0
+            majority_ratio = 0.0
+        else:
+            # Count cluster memberships
+            cluster_counts = Counter(cluster_labels)
+
+            # Build reward_p: each answer gets reward based on its cluster size
+            reward_p = [0.0] * total
+            for i, orig_idx in enumerate(valid_indices):
+                cluster_id = cluster_labels[i]
+                reward_p[orig_idx] = cluster_counts[cluster_id] / total
+
+            # Compute entropy based on cluster distribution
+            entropy = 0.0
+            for count in cluster_counts.values():
+                probability = count / len(cluster_labels)
+                if probability > 0:
+                    entropy -= probability * math.log(probability)
+
+            # Normalize entropy
+            n_clusters = len(cluster_counts)
+            if n_clusters > 1:
+                max_entropy = math.log(n_clusters)
+                normalized_entropy = entropy / max_entropy if max_entropy > 0 else 0.0
+            else:
+                normalized_entropy = 0.0
+
+            # Find majority cluster and its representative
+            majority_cluster_id, majority_count = cluster_counts.most_common(1)[0]
+
+            # Get representative interval from majority cluster (use centroid)
+            majority_intervals = [
+                parsed_intervals[i]
+                for i, label in enumerate(cluster_labels)
+                if label == majority_cluster_id
+            ]
+            avg_start = np.mean([iv[0] for iv in majority_intervals])
+            avg_end = np.mean([iv[1] for iv in majority_intervals])
+            estimated_label = f"({avg_start:.2f}, {avg_end:.2f})"
+
+            majority_ratio = majority_count / total
     else:
-        normalized_entropy = 0.0
+        counter = Counter(model_answers)
+        reward_p = [counter[ans] / total for ans in model_answers]
 
-    estimated_label, majority_count = counter.most_common(1)[0]
-    majority_ratio = majority_count / len(solutions)
+        entropy = 0.0
+        for count in counter.values():
+            probability = count / total
+            if probability > 0:  # Avoid log(0)
+                entropy -= probability * math.log(probability)
+
+        if total > 1:
+            max_entropy = math.log(
+                len(counter)
+            )  # Max entropy for this many unique answers
+            normalized_entropy = entropy / max_entropy if max_entropy > 0 else 0.0
+        else:
+            normalized_entropy = 0.0
+
+        estimated_label, majority_count = counter.most_common(1)[0]
+        majority_ratio = majority_count / len(solutions)
 
     rewards, _ = auto_verify(
         task, solutions, [estimated_label] * len(solutions), extra_info=extra_info
