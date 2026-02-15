@@ -35,7 +35,7 @@ def compute_temporal_iou_distance_matrix(intervals):
     return dist_matrix
 
 
-def cluster_temporal_segments(model_answers, distance_threshold=0.15):
+def cluster_temporal_segments(model_answers, distance_threshold=0.10):
     """
     Cluster temporal segments based on IoU similarity using Agglomerative Clustering.
 
@@ -161,7 +161,7 @@ def test_time_train_metrics(
     if task == "tag":
         # Use IoU-based clustering for temporal segments
         cluster_labels, parsed_intervals, valid_indices = cluster_temporal_segments(
-            model_answers, distance_threshold=0.15
+            model_answers, distance_threshold=0.10
         )
 
         if len(cluster_labels) == 0:

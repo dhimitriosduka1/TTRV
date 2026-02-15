@@ -168,11 +168,11 @@ class RLHFDataset(Dataset):
                 def doc2len(doc) -> int:
                     return len(tokenizer.apply_chat_template(doc[prompt_key], add_generation_prompt=True))
 
-            self.dataframe = self.dataframe.filter(
-                lambda doc: doc2len(doc) <= self.max_prompt_length,
-                num_proc=self.num_workers,
-                desc=f"Filtering prompts longer than {self.max_prompt_length} tokens",
-            )
+            # self.dataframe = self.dataframe.filter(
+            #     lambda doc: doc2len(doc) <= self.max_prompt_length,
+            #     num_proc=self.num_workers,
+            #     desc=f"Filtering prompts longer than {self.max_prompt_length} tokens",
+            # )
 
             print(f"filter dataset len: {len(self.dataframe)}")
 

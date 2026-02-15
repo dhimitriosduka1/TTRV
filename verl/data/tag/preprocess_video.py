@@ -17,6 +17,7 @@ def make_map_fn(split):
             "extra_info": {
                 "split": split,
                 "index": f"{example.get('data_source', 'EGO4D')}-{idx}",
+                "uuid": example.get("uuid"),
             },
             "videos": [
                 {"video": path, "fps": DEFAULT_FPS, "max_pixels": DEFAULT_MAX_PIXELS}
@@ -29,7 +30,7 @@ def make_map_fn(split):
 
 
 if __name__ == "__main__":
-    data_dir = os.path.dirname(os.path.abspath(__file__))
+    data_dir = "/u/dduka/project/RL/TTRV/verl/data/tag/"
 
     train_path = os.path.join(data_dir, "train.json")
     test_path = os.path.join(data_dir, "test.json")

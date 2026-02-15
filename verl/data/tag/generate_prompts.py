@@ -2,7 +2,7 @@ import json
 import pickle
 
 VIDEO_BASE = "/dais/fs/scratch/dduka/databases/ego4d/video_320px_15sec"
-PICKLE_PATH = "/dais/fs/scratch/dduka/databases/ego4d/ego4d_train.pkl"
+PICKLE_PATH = "/dais/fs/scratch/dduka/databases/ego4d/ego4d_train_with_uuid.pkl"
 CHUNK_DURATION = 15
 PROMPT_TEMPLATE = """TASK: Temporal localization in egocentric video.
 
@@ -23,7 +23,7 @@ PROMPT_TEMPLATE = """TASK: Temporal localization in egocentric video.
 
     CRITICAL RULES:
     - Boundaries must be TIGHT: start at first evidence of action, end when action completes
-    - Do NOT include preparation or aftermath unless part of the described action
+    - Do NOT include preparation or aftermath unless part of the described action 
     - If action spans multiple sub-actions, include the full sequence
     - Times are relative to video start (0.0s = first frame)
 
@@ -76,7 +76,7 @@ def process_items(items, start_idx=0):
     """
     training_data = []
     for idx, item in enumerate(items):
-        video_id, start, end, caption = item
+        uuid, video_id, start, end, caption = item
         start, end = float(start), float(end)
 
         chunks, first_chunk_start = get_chunk_paths(video_id, start, end)
@@ -102,6 +102,7 @@ def process_items(items, start_idx=0):
                 "answer": [0.0, 0.0],
                 "source": "dduka",
                 "id": idx,
+                "uuid": uuid,
             }
         )
 
@@ -112,8 +113,8 @@ def main():
     with open(PICKLE_PATH, "rb") as f:
         data = pickle.load(f)
 
-    train_items = data[:100_000]
-    test_items = data[100_000:101_000]
+    train_items = data[:10]
+    test_items = data[len(data) - 10 :]
 
     train_data = process_items(train_items, start_idx=0)
     test_data = process_items(test_items, start_idx=0)
