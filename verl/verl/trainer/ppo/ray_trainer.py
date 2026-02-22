@@ -1217,17 +1217,22 @@ class RayPPOTrainer:
 
         from verl.utils.tracking import Tracking
 
+        self.global_steps = 0
+
+        # load checkpoint before doing anything
+        self._load_checkpoint()
+
+        import re
+        safe_experiment_name = re.sub(r"[:;,#?/'\\]", "_", self.config.trainer.experiment_name)
+
         logger = Tracking(
             project_name=self.config.trainer.project_name,
             experiment_name=self.config.trainer.experiment_name,
             default_backend=self.config.trainer.logger,
             config=OmegaConf.to_container(self.config, resolve=True),
+            resume="allow",
+            id=safe_experiment_name,
         )
-
-        self.global_steps = 0
-
-        # load checkpoint before doing anything
-        self._load_checkpoint()
 
         # perform validation before training
         # currently, we only support validation using the reward_function.
@@ -1493,20 +1498,20 @@ class RayPPOTrainer:
                         )
                         metrics.update(actor_output_metrics)
 
-                    # # validate
-                    # if (
-                    #     self.val_reward_fn is not None
-                    #     and self.config.trainer.test_freq > 0
-                    #     and (
-                    #         is_last_step
-                    #         or self.global_steps % self.config.trainer.test_freq == 0
-                    #     )
-                    # ):
-                    #     with _timer("testing", timing_raw):
-                    #         val_metrics: dict = self._validate()
-                    #         if is_last_step:
-                    #             last_val_metrics = val_metrics
-                    #     metrics.update(val_metrics)
+                    # validate
+                    if (
+                        self.val_reward_fn is not None
+                        and self.config.trainer.test_freq > 0
+                        and (
+                            is_last_step
+                            or self.global_steps % self.config.trainer.test_freq == 0
+                        )
+                    ):
+                        with _timer("testing", timing_raw):
+                            val_metrics: dict = self._validate()
+                            if is_last_step:
+                                last_val_metrics = val_metrics
+                        metrics.update(val_metrics)
 
                     if self.config.trainer.save_freq > 0 and (
                         is_last_step
