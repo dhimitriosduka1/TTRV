@@ -1091,7 +1091,7 @@ class RayPPOTrainer:
         dataloader_local_path = os.path.join(local_global_step_folder, "data.pt")
         # ensure_dir_exists(dataloader_local_path)
         dataloader_state_dict = self.train_dataloader.state_dict()
-        torch.save(dataloader_state_dict, dataloader_local_path)
+        torch.save(dataloader_state_dict, dataloader_local_path, _use_new_zipfile_serialization=False)
 
         # latest checkpointed iteration tracker (for atomic usage)
         local_latest_checkpointed_iteration = os.path.join(
@@ -1231,14 +1231,14 @@ class RayPPOTrainer:
 
         # perform validation before training
         # currently, we only support validation using the reward_function.
-        if self.val_reward_fn is not None and self.config.trainer.get(
-            "val_before_train", True
-        ):
-            val_metrics = self._validate()
-            pprint(f"Initial validation metrics: {val_metrics}")
-            logger.log(data=val_metrics, step=self.global_steps)
-            if self.config.trainer.get("val_only", False):
-                return
+        # if self.val_reward_fn is not None and self.config.trainer.get(
+        #     "val_before_train", True
+        # ):
+        #     val_metrics = self._validate()
+        #     pprint(f"Initial validation metrics: {val_metrics}")
+        #     logger.log(data=val_metrics, step=self.global_steps)
+        #     if self.config.trainer.get("val_only", False):
+        #         return
 
         # add tqdm
         progress_bar = tqdm(
@@ -1493,20 +1493,20 @@ class RayPPOTrainer:
                         )
                         metrics.update(actor_output_metrics)
 
-                    # validate
-                    if (
-                        self.val_reward_fn is not None
-                        and self.config.trainer.test_freq > 0
-                        and (
-                            is_last_step
-                            or self.global_steps % self.config.trainer.test_freq == 0
-                        )
-                    ):
-                        with _timer("testing", timing_raw):
-                            val_metrics: dict = self._validate()
-                            if is_last_step:
-                                last_val_metrics = val_metrics
-                        metrics.update(val_metrics)
+                    # # validate
+                    # if (
+                    #     self.val_reward_fn is not None
+                    #     and self.config.trainer.test_freq > 0
+                    #     and (
+                    #         is_last_step
+                    #         or self.global_steps % self.config.trainer.test_freq == 0
+                    #     )
+                    # ):
+                    #     with _timer("testing", timing_raw):
+                    #         val_metrics: dict = self._validate()
+                    #         if is_last_step:
+                    #             last_val_metrics = val_metrics
+                    #     metrics.update(val_metrics)
 
                     if self.config.trainer.save_freq > 0 and (
                         is_last_step

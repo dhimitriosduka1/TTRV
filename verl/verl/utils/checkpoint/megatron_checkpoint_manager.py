@@ -251,7 +251,7 @@ class MegatronCheckpointManager(BaseCheckpointManager):
             model_ckpt_path = get_model_checkpoint_path(local_path)
             hf_model_ckpt_path = get_hf_model_checkpoint_path(local_path)
             ckpt_name = self.get_checkpoint_name(model_ckpt_path, return_base_dir=False)
-            torch.save(state_dicts, os.path.join(ckpt_name))
+            torch.save(state_dicts, os.path.join(ckpt_name), _use_new_zipfile_serialization=False)
             self.processing_class.save_pretrained(hf_model_ckpt_path)  # tokenizer will be saved to hf_model_ckpt_path
             print(f"Saved checkpoint to {model_ckpt_path}")
             if hdfs_path is not None:
@@ -318,7 +318,7 @@ class MegatronCheckpointManager(BaseCheckpointManager):
 
             rng_state_path = get_rng_states_checkpoint_path(local_path, only_rank0_save=False)
             rng_state = self.get_rng_state()
-            torch.save(rng_state, rng_state_path)
+            torch.save(rng_state, rng_state_path, _use_new_zipfile_serialization=False)
             print(f"Rank {self.rank} saving rng states to {rng_state_path}")
 
         self.previous_saved_paths.append(local_path)

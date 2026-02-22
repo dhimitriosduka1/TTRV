@@ -269,7 +269,7 @@ class RayPRIMETrainer(RayPPOTrainer):
         dataloader_local_path = os.path.join(local_global_step_folder, "data.pt")
         import dill
 
-        torch.save(self.train_dataloader, dataloader_local_path, pickle_module=dill)
+        torch.save(self.train_dataloader, dataloader_local_path, pickle_module=dill, _use_new_zipfile_serialization=False)
 
         # latest checkpointed iteration tracker (for atomic usage)
         local_latest_checkpointed_iteration = os.path.join(
