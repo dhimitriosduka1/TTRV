@@ -240,11 +240,36 @@ class ActorRolloutRefWorker(Worker):
                 for param in actor_module.vision_model.parameters():
                     param.requires_grad = False
                 frozen_vision_tower = True
+
             if frozen_vision_tower:
                 if re.match("gemma3", actor_module.config.model_type, re.IGNORECASE):
                     for name, param in actor_module.named_parameters():
                         if "vision_tower" in name:
                             param.requires_grad = False
+
+            # 2. Handle Qwen3VL
+            # We look for the 'visual' attribute common in Qwen-VL implementations
+            # +actor_rollout_ref.model.freeze_vision_tower=True \
+            print(f"=============================================================================")
+            print(f"Model type: {actor_module.config.model_type}")
+            print(f"Freeze vision tower: {self.config.model.get('freeze_vision_tower', False)}")
+            print(f"=============================================================================")
+            if re.match("qwen.*vl", actor_module.config.model_type, re.IGNORECASE) and self.config.model.get("freeze_vision_tower", False):
+                if hasattr(actor_module, 'visual'):
+                    for param in actor_module.visual.parameters():
+                        param.requires_grad = False
+                    frozen_vision_tower = True
+                    logger.info("Frozen Qwen-VL vision encoder")
+
+                elif hasattr(actor_module, 'vision_tower'):
+                    for param in actor_module.vision_tower.parameters():
+                        param.requires_grad = False
+                    frozen_vision_tower = True
+                    logger.info("Frozen Qwen-VL vision_tower")
+
+                else:
+                    logger.warning("Could not find vision encoder in Qwen-VL model to freeze")
+
             if frozen_vision_tower:
                 use_orig_params = True
 
@@ -256,7 +281,6 @@ class ActorRolloutRefWorker(Worker):
             # Apply Liger kernel to the model if use_liger is set to True
             if use_liger:
                 from liger_kernel.transformers.monkey_patch import _apply_liger_kernel_to_instance
-
                 _apply_liger_kernel_to_instance(model=actor_module)
 
             # some parameters may not in torch_dtype. TODO(zhangchi.usc1992) remove this after we switch to fsdp2
@@ -303,7 +327,7 @@ class ActorRolloutRefWorker(Worker):
             actor_module,
             cpu_offload=cpu_offload,
             param_init_fn=init_fn,
-            use_orig_params=False,
+            use_orig_params=use_orig_params,
             auto_wrap_policy=auto_wrap_policy,
             device_id=torch.cuda.current_device(),
             sharding_strategy=sharding_strategy,  # zero3

@@ -2,7 +2,7 @@ import os
 import datasets
 
 DEFAULT_MAX_PIXELS = 360 * 420
-DEFAULT_FPS = 8
+DEFAULT_FPS = 4
 
 
 def make_map_fn(split):

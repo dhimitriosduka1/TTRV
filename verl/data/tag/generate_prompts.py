@@ -1,8 +1,10 @@
 import json
+import os
 import pickle
 
+BASE_OUTPUT_DIR = "/u/dduka/project/RL/TTRV/verl/data/tag/"
 VIDEO_BASE = "/dais/fs/scratch/dduka/databases/ego4d/video_320px_15sec"
-PICKLE_PATH = "/dais/fs/scratch/dduka/databases/ego4d/ego4d_train_with_uuid.pkl"
+PICKLE_PATH = "/dais/fs/scratch/dduka/databases/ego4d/random_shift/ego4d_train_random_shift_2.1_2.1_1.0_with_uuid.pkl"
 CHUNK_DURATION = 15
 PROMPT_TEMPLATE = """TASK: Temporal localization in egocentric video.
 
@@ -75,6 +77,7 @@ def process_items(items, start_idx=0):
 
     """
     training_data = []
+    longer_than_2_chunks = 0
     for idx, item in enumerate(items):
         uuid, video_id, start, end, caption = item
         start, end = float(start), float(end)
@@ -91,6 +94,10 @@ def process_items(items, start_idx=0):
 
         assert rel_start >= 0 and rel_end >= 0 and rel_start < rel_end
 
+        if len(chunks) > 2:
+            longer_than_2_chunks += 1
+            continue
+
         # This has to be a simple dict as follows
         training_data.append(
             {
@@ -106,6 +113,9 @@ def process_items(items, start_idx=0):
             }
         )
 
+    print(f"Skipped {longer_than_2_chunks} items longer than 2 chunks")
+    print(f"Percentage skipped: {longer_than_2_chunks / len(items) * 100:.2f}%")
+
     return training_data
 
 
@@ -113,16 +123,16 @@ def main():
     with open(PICKLE_PATH, "rb") as f:
         data = pickle.load(f)
 
-    train_items = data[:10]
+    train_items = data[: len(data) - 10]
     test_items = data[len(data) - 10 :]
 
     train_data = process_items(train_items, start_idx=0)
     test_data = process_items(test_items, start_idx=0)
 
-    with open("train.json", "w") as f:
+    with open(os.path.join(BASE_OUTPUT_DIR, "train.json"), "w") as f:
         json.dump(train_data, f, indent=2)
 
-    with open("test.json", "w") as f:
+    with open(os.path.join(BASE_OUTPUT_DIR, "test.json"), "w") as f:
         json.dump(test_data, f, indent=2)
 
     print(f"Created train.json with {len(train_data)} items")
