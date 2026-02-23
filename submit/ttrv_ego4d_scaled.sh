@@ -58,11 +58,11 @@ DATA_LOCAL_DIR="/u/dduka/project/RL/TTRV/verl/data"
 BACKBONE_PATH="Qwen/Qwen3-VL-8B-Instruct"
 
 MODEL="${TASK}-${BACKBONE_PATH}"
-EXPERIMENT="TTRL-EGO4D-TAR-SCALED-SEGMENTS"
+EXPERIMENT="TTRL-SCALED-SEGMENTS"
 
 WANDB_PROJECT="TTRL-verl"
 LOG_NAME="${EXPERIMENT}-${MODEL}-${ADVANTAGE}"
-OUTPUT_DIR="/dais/fs/scratch/dduka/training_metadata/ttrv/checkpoints/${WANDB_PROJECT}/${MODEL}/${EXPERIMENT}-${ADVANTAGE}"
+OUTPUT_DIR="/dais/fs/scratch/dduka/training_metadata/ttrv/checkpoints/${EXPERIMENT}"
 
 BACKBONE_SAFE=$(echo "$BACKBONE_PATH" | tr '/' '_')
 LOG_FILE="/dais/fs/scratch/dduka/logs/ttrv/${EXPERIMENT}_${BACKBONE_SAFE}_${EPISODE}e.log"
