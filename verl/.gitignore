@@ -130,4 +130,5 @@ outputs
 .venv
 
 ./data/tag/
+./data/tag/standard/train.json
 verl/data/tag/standard/train.json
