@@ -128,3 +128,6 @@ log
 outputs
 
 .venv
+
+./data/tag/
+verl/data/tag/standard/train.json
