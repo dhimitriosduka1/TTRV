@@ -117,10 +117,18 @@ def compute_temporal_metrics(solutions: List[str], model_answers: List[str]):
         durations = [end - start for start, end in parsed_intervals]
 
         # Average duration: Are predictions reasonable lengths?
+        metrics["temporal_min_duration"] = float(np.min(durations))
+        metrics["temporal_max_duration"] = float(np.max(durations))
+
         metrics["temporal_avg_duration"] = float(np.mean(durations))
         metrics["temporal_std_duration"] = float(np.std(durations))
 
         # Start/end point statistics
+        metrics["temporal_min_start"] = float(np.min(starts))
+        metrics["temporal_max_start"] = float(np.max(starts))
+        metrics["temporal_min_end"] = float(np.min(ends))
+        metrics["temporal_max_end"] = float(np.max(ends))
+        
         metrics["temporal_avg_start"] = float(np.mean(starts))
         metrics["temporal_std_start"] = float(np.std(starts))
         metrics["temporal_avg_end"] = float(np.mean(ends))
