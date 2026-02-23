@@ -25,6 +25,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from pprint import pprint
 from typing import Dict, Type
+from collections import defaultdict
 
 import numpy as np
 import ray
@@ -781,13 +782,10 @@ class RayPPOTrainer:
         return metric_dict
 
     def _validate(self):
-        data_source_lst = []
-        reward_extra_infos_dict: dict[str, list] = defaultdict(list)
-
-        # Lists to collect samples for the table
         sample_inputs = []
         sample_outputs = []
-        sample_scores = []
+
+        results = []
 
         for test_data in tqdm(self.val_dataloader, desc="Validation"):
             test_batch = DataProto.from_single_dict(test_data)
@@ -864,64 +862,17 @@ class RayPPOTrainer:
 
             # evaluate using reward_function
             result = self.val_reward_fn(test_batch, return_dict=True)
-            reward_tensor = result["reward_tensor"]
-            scores = reward_tensor.sum(-1).cpu().tolist()
-            sample_scores.extend(scores)
-
-            reward_extra_infos_dict["reward"].extend(scores)
-            if "reward_extra_info" in result:
-                for key, lst in result["reward_extra_info"].items():
-                    reward_extra_infos_dict[key].extend(lst)
-
-            data_source_lst.append(
-                test_batch.non_tensor_batch.get(
-                    "data_source", ["unknown"] * reward_tensor.shape[0]
-                )
-            )
-
-        self._maybe_log_val_generations(
-            inputs=sample_inputs, outputs=sample_outputs, scores=sample_scores
-        )
-
-        for key_info, lst in reward_extra_infos_dict.items():
-            assert len(lst) == 0 or len(lst) == len(
-                sample_scores
-            ), f"{key_info}: {len(lst)=}, {len(sample_scores)=}"
-
-        data_sources = np.concatenate(data_source_lst, axis=0)
-
-        data_src2var2metric2val = process_validation_metrics(
-            data_sources, sample_inputs, reward_extra_infos_dict
-        )
+            results.append(result)
+          
         metric_dict = {}
-        for data_source, var2metric2val in data_src2var2metric2val.items():
-            core_var = "acc" if "acc" in var2metric2val else "reward"
-            for var_name, metric2val in var2metric2val.items():
-                n_max = max(
-                    [
-                        int(name.split("@")[-1].split("/")[0])
-                        for name in metric2val.keys()
-                    ]
-                )
-                for metric_name, metric_val in metric2val.items():
-                    if (
-                        (var_name == core_var)
-                        and any(
-                            metric_name.startswith(pfx)
-                            for pfx in ["mean", "maj", "best"]
-                        )
-                        and (f"@{n_max}" in metric_name)
-                    ):
-                        metric_sec = "val-core"
-                    else:
-                        metric_sec = "val-aux"
-                    pfx = f"{metric_sec}/{data_source}/{var_name}/{metric_name}"
-                    metric_dict[pfx] = metric_val
 
-        # add ttrl metrics
-        if self.use_ttrl and "ttrl_info" in result:
-            for key, val in result["ttrl_info"].items():
-                metric_dict[f"val-ttrl/{key}"] = val
+        intermediate_metrics = defaultdict(list)
+        for batch_result in results:
+            for key, value in batch_result.items():
+                intermediate_metrics[key].append(value)
+
+        for key, values in intermediate_metrics.items():
+            metric_dict[f"val/{key}"] = sum(values) / len(values) if values else 0.0
 
         return metric_dict
 
@@ -1236,14 +1187,14 @@ class RayPPOTrainer:
 
         # perform validation before training
         # currently, we only support validation using the reward_function.
-        # if self.val_reward_fn is not None and self.config.trainer.get(
-        #     "val_before_train", True
-        # ):
-        #     val_metrics = self._validate()
-        #     pprint(f"Initial validation metrics: {val_metrics}")
-        #     logger.log(data=val_metrics, step=self.global_steps)
-        #     if self.config.trainer.get("val_only", False):
-        #         return
+        if self.val_reward_fn is not None and self.config.trainer.get(
+            "val_before_train", True
+        ):
+            val_metrics = self._validate()
+            pprint(f"Initial validation metrics: {val_metrics}")
+            logger.log(data=val_metrics, step=self.global_steps)
+            if self.config.trainer.get("val_only", False):
+                return
 
         # add tqdm
         progress_bar = tqdm(

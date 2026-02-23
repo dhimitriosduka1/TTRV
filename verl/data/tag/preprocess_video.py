@@ -32,8 +32,8 @@ def make_map_fn(split):
 if __name__ == "__main__":
     data_dir = "/u/dduka/project/RL/TTRV/verl/data/tag/"
 
-    train_path = os.path.join(data_dir, "train_point_supervision.json")
-    test_path = os.path.join(data_dir, "test_point_supervision.json")
+    train_path = os.path.join(data_dir, "train.json")
+    test_path = os.path.join(data_dir, "test.json")
 
     train_dataset = datasets.load_dataset("json", data_files=train_path, split="train")
     test_dataset = datasets.load_dataset("json", data_files=test_path, split="train")
@@ -55,5 +55,10 @@ if __name__ == "__main__":
 
     print("\nSample train item:")
     sample = train_dataset[0]
+    for key, value in sample.items():
+        print(f"  {key}: {value}")
+    
+    print("\nSample test item:")
+    sample = test_dataset[0]
     for key, value in sample.items():
         print(f"  {key}: {value}")

@@ -36,3 +36,23 @@ def auto_verify(task, all_outputs, all_labels, extra_info=None):
     verify_extra_info["pred"] = auto_extract(task, all_outputs, extra_info=extra_info)
 
     return rewards, verify_extra_info
+
+def auto_verify_tag_specific(all_outputs, all_labels, extra_info=None):
+    all_outputs = auto_extract("tag", all_outputs, extra_info=extra_info)
+
+    ious = []
+    for output, label in zip(all_outputs, all_labels):
+        iou = qwen_reward_fn_temporal(output, label)
+        ious.append(iou)
+
+    # Compute average IoU
+    average_iou = sum(ious) / len(ious) if ious else 0.0
+
+    # Compute IoU at different thresholds
+    thresholds = [0.3, 0.5, 0.7, 0.9]
+    iou_at_thresholds = {f"iou@{threshold}": (100 * (sum(iou >= threshold for iou in ious) / len(ious))) if ious else 0.0 for threshold in thresholds}
+
+    return {
+        "average_iou": average_iou,
+        **iou_at_thresholds
+    }

@@ -18,7 +18,7 @@ import numpy as np
 import torch
 
 from verl import DataProto
-from verl.utils.reward_score.ttrl.auto_verify import auto_verify
+from verl.utils.reward_score.ttrl.auto_verify import auto_verify, auto_verify_tag_specific
 from verl.utils.reward_score.ttrl.ttt_metrics import (
     # post_test_time_train_metrics,
     test_time_train_metrics,
@@ -238,11 +238,6 @@ class TTRLRewardManager:
         return reward_tensor, reward_extra_info, ttrl_info
 
     def _compute_eval_reward(self, data: DataProto):
-
-        reward_extra_info = defaultdict(list)
-        ttrl_info = {}
-
-        reward_tensor = torch.zeros_like(data.batch["responses"], dtype=torch.float32)
         group_pred_outputs = []
         group_labels = []
         group_extra_info = []
@@ -290,79 +285,9 @@ class TTRLRewardManager:
                     raise NotImplementedError(
                         f"Non consistent task {task} and {self._data_source_to_task(data_source)} for TTRLRewardManager"
                     )
-
-        rewards, verify_extra_info = auto_verify(
-            task, group_pred_outputs, group_labels, extra_info=group_extra_info
-        )
-
-        for k, v in verify_extra_info.items():
-            if isinstance(v, list):
-                reward_extra_info[k] += v
-
-        for i in range(len(data)):
-            reward_tensor[i, valid_response_length - 1] = rewards[i]
-
-        # Compute TTRL metrics
-        all_ttrl_metrics = defaultdict(list)
-        prompt_num = len(data) // self.eval_n_samples
-        for prompt_i in range(prompt_num):
-            group_pred_outputs_ttrl = []
-            group_labels_ttrl = []
-            group_extra_info_ttrl = []
-            task = None
-
-            for i in range(self.eval_n_samples):
-                data_item = data[prompt_i * self.eval_n_samples + i]
-                prompt_idx = data_item.batch["prompts"]
-                prompt_length = prompt_idx.shape[-1]
-                valid_prompt_length = data_item.batch["attention_mask"][
-                    :prompt_length
-                ].sum()
-                valid_prompt_idx = prompt_idx[-valid_prompt_length:]
-                response_idx = data_item.batch["responses"]
-                valid_response_length = data_item.batch["attention_mask"][
-                    prompt_length:
-                ].sum()
-                valid_response_idx = response_idx[:valid_response_length]
-
-                prompt_str = self.tokenizer.decode(
-                    valid_prompt_idx, skip_special_tokens=False
-                )
-                response_str = self.tokenizer.decode(
-                    valid_response_idx, skip_special_tokens=False
-                )
-                ground_truth = data_item.non_tensor_batch["reward_model"][
-                    "ground_truth"
-                ]
-                data_source = data_item.non_tensor_batch[self.reward_fn_key]
-                extra_info = data_item.non_tensor_batch["extra_info"]
-                if task is None:
-                    task = self._data_source_to_task(data_source)
-                else:
-                    if task != self._data_source_to_task(data_source):
-                        raise NotImplementedError(
-                            f"Non consistent task {task} and {self._data_source_to_task(data_source)} for TTRLRewardManager"
-                        )
-
-                group_labels_ttrl.append(ground_truth)
-                group_pred_outputs_ttrl.append(response_str)
-                group_extra_info_ttrl.append(extra_info)
-
-            _, ttrl_metrics = test_time_train_metrics(
-                group_pred_outputs_ttrl,
-                group_labels_ttrl,
-                task=task,
-                extra_info=group_extra_info_ttrl,
-            )
-            for k, v in ttrl_metrics.items():
-                all_ttrl_metrics[k].append(v)
-
-        for k, v in all_ttrl_metrics.items():
-            if isinstance(v, list):
-                v = np.mean(v)
-                ttrl_info[k] = v
-
-        return reward_tensor, reward_extra_info, ttrl_info
+            
+        print(f"+++++++++++++++++++ Finished computing predictions for evaluation, now computing evaluation metrics with auto_verify_tag_specific +++++++++++++++++++")
+        return auto_verify_tag_specific(group_pred_outputs, group_labels, extra_info=group_extra_info)
 
     def __call__(self, data: DataProto, return_dict=False):
 
@@ -372,10 +297,7 @@ class TTRLRewardManager:
                 data
             )
         elif self.mode == "eval":
-            # print("eval reward")
-            reward_tensor, reward_extra_info, ttrl_info = self._compute_eval_reward(
-                data
-            )
+            return self._compute_eval_reward(data)
         else:
             raise NotImplementedError(
                 f"Mode {self.mode} is not supported for TTRLRewardManager"
