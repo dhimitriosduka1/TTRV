@@ -1,7 +1,9 @@
 import json
 import os
 import pickle
+import pandas as pd
 
+MANUALLY_ANNOTATED_VIDEOS_PATH = "/u/dduka/project/RL/TTRV/verl/data/tag/test_gt.csv"
 BASE_OUTPUT_DIR = "/u/dduka/project/RL/TTRV/verl/data/tag/"
 VIDEO_BASE = "/dais/fs/scratch/dduka/databases/ego4d/video_320px_15sec"
 PICKLE_PATH = "/dais/fs/scratch/dduka/databases/ego4d/ego4d_train_with_uuid.pkl"
@@ -49,7 +51,7 @@ def get_chunk_paths(video_id: str, start_time: float, end_time: float):
         Tuple of (list of video dicts, context_start_time)
     """
     context_start = start_time
-    context_end = end_time
+    context_end = end_time - 0.0001
 
     start_chunk_idx = int(context_start // CHUNK_DURATION)
     end_chunk_idx = int(context_end // CHUNK_DURATION)
@@ -65,12 +67,12 @@ def get_chunk_paths(video_id: str, start_time: float, end_time: float):
     return chunks, first_chunk_start
 
 
-def process_items(items, start_idx=0):
+def process_items(items, is_test=False):
     """Convert list of items to format expected by TTRL training.
 
     Args:
         items: List of (video_id, start, end, caption) tuples
-        start_idx: Starting index for extra_info
+        is_test: Whether this is test data (if so, include ground truth in answer)
 
     Returns:
         List of training data dicts
@@ -79,8 +81,13 @@ def process_items(items, start_idx=0):
     training_data = []
     longer_than_2_chunks = 0
     for idx, item in enumerate(items):
-        uuid, video_id, start, end, caption = item
+        uuid, video_id, start, end, caption, start_gt, end_gt = item
         start, end = float(start), float(end)
+
+        old_start, old_end = start, end
+
+        start = min(start, start_gt) if is_test else start
+        end = max(end, end_gt) if is_test else end
 
         chunks, first_chunk_start = get_chunk_paths(video_id, start, end)
 
@@ -89,10 +96,20 @@ def process_items(items, start_idx=0):
             continue
 
         # Timestamps relative to first chunk start
-        rel_start = start - first_chunk_start
-        rel_end = end - first_chunk_start
+        rel_start = old_start - first_chunk_start
+        rel_end = old_end - first_chunk_start
+
+        if is_test:
+            rel_start_gt = start_gt - first_chunk_start
+            rel_end_gt = end_gt - first_chunk_start
+        else:
+            rel_start_gt = None
+            rel_end_gt = None
 
         assert rel_start >= 0 and rel_end >= 0 and rel_start < rel_end
+        
+        if is_test:
+            assert rel_start_gt >= 0 and rel_end_gt >= 0 and rel_start_gt < rel_end_gt
 
         if len(chunks) > 2:
             longer_than_2_chunks += 1
@@ -106,7 +123,7 @@ def process_items(items, start_idx=0):
                     caption=caption, seed_time=rel_start + (rel_end - rel_start) / 2
                 ),
                 "video_paths": chunks,
-                "answer": [0.0, 0.0],
+                "answer": [rel_start_gt, rel_end_gt] if is_test else [0.0, 0.0],
                 "source": "dduka",
                 "id": idx,
                 "uuid": uuid,
@@ -123,20 +140,40 @@ def main():
     with open(PICKLE_PATH, "rb") as f:
         data = pickle.load(f)
 
-    train_items = data[: len(data) - 10]
-    test_items = data[len(data) - 10 :]
+    with open(MANUALLY_ANNOTATED_VIDEOS_PATH, "r") as f:
+        manually_annotated_df = pd.read_csv(f)
 
-    train_data = process_items(train_items, start_idx=0)
-    test_data = process_items(test_items, start_idx=0)
+    # Extract the set of manually annotated video UUIDs
+    manually_annotated_uuids = set(manually_annotated_df["uuid"].tolist())
+    
+    # Filter the train to not include any manually annotated videos, and put those in the test set instead
+    train_items = [(*item, None, None) for item in data if item[0] not in manually_annotated_uuids]
 
-    with open(os.path.join(BASE_OUTPUT_DIR, "train_point_supervision.json"), "w") as f:
+    test_items = []
+    for sample in data:
+        uuid = sample[0]
+        if uuid in manually_annotated_uuids:
+            video_id = sample[1]
+            caption = sample[4] 
+            # Retrieve the data from the manually annotated CSV for this uuid
+            annotation_row = manually_annotated_df[manually_annotated_df["uuid"] == uuid]            
+            test_items.append((uuid, video_id, sample[2], sample[3], caption, annotation_row.iloc[0]["start_s"], annotation_row.iloc[0]["end_s"]))
+
+    print(f"Total items: {len(data)}")
+    print(f"Train items (excluding manually annotated): {len(train_items)}")
+    print(f"Test items (manually annotated): {len(test_items)}")
+
+    train_data = process_items(train_items)
+    test_data = process_items(test_items, is_test=True)
+
+    with open(os.path.join(BASE_OUTPUT_DIR, "train.json"), "w") as f:
         json.dump(train_data, f, indent=2)
 
-    with open(os.path.join(BASE_OUTPUT_DIR, "test_point_supervision.json"), "w") as f:
+    with open(os.path.join(BASE_OUTPUT_DIR, "test.json"), "w") as f:
         json.dump(test_data, f, indent=2)
 
-    print(f"Created train_point_supervision.json with {len(train_data)} items")
-    print(f"Created test_point_supervision.json with {len(test_data)} items")
+    print(f"Created train.json with {len(train_data)} items")
+    print(f"Created test.json with {len(test_data)} items")
     print(f"\nSample train item:\n{json.dumps(train_data[0], indent=2)}")
 
 

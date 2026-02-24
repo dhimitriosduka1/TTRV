@@ -51,7 +51,7 @@ def get_chunk_paths(video_id: str, start_time: float, end_time: float):
         Tuple of (list of video dicts, context_start_time)
     """
     context_start = start_time
-    context_end = end_time
+    context_end = end_time - 0.0001
 
     start_chunk_idx = int(context_start // CHUNK_DURATION)
     end_chunk_idx = int(context_end // CHUNK_DURATION)
