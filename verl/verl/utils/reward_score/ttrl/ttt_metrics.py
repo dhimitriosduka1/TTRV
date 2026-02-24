@@ -152,104 +152,103 @@ def compute_temporal_metrics(solutions: List[str], model_answers: List[str]):
         metrics["temporal_std_end"] = 0.0
         metrics["temporal_consistency"] = 0.0
         metrics["temporal_invalid_order_rate"] = 0.0
+        metrics["temporal_min_duration"] = 0.0
+        metrics["temporal_max_duration"] = 0.0
+        metrics["temporal_min_start"] = 0.0
+        metrics["temporal_max_start"] = 0.0
+        metrics["temporal_min_end"] = 0.0
+        metrics["temporal_max_end"] = 0.0
 
     return metrics
 
 
 def test_time_train_metrics(
-    solutions: List[str], ground_truth: List[str] = None, task="math", extra_info=None
+    solutions: List[str], ground_truth: List[str] = None, task="tag", extra_info=None, distance_threshold=0.10
 ):
     """
     Compute TTRL metrics using self-consistency (no ground truth required).
     Ground truth parameter is kept for API compatibility but not used.
     """
+    assert task == "tag", "Currently only 'tag' task has test-time train metrics implemented"
+
     model_answers = auto_extract(task, solutions, extra_info=extra_info)
     total = len(model_answers)
 
-    if task == "tag":
-        # Use IoU-based clustering for temporal segments
-        cluster_labels, parsed_intervals, valid_indices = cluster_temporal_segments(
-            model_answers, distance_threshold=0.10
-        )
+    # Use IoU-based clustering for temporal segments
+    cluster_labels, parsed_intervals, valid_indices = cluster_temporal_segments(
+        model_answers, distance_threshold=distance_threshold
+    )
 
-        if len(cluster_labels) == 0:
-            # No valid intervals, all get zero reward
-            reward_p = [0.0] * total
-            entropy = 0.0
-            normalized_entropy = 0.0
-            estimated_label = ""
-            majority_count = 0
-            majority_ratio = 0.0
-        else:
-            # Count cluster memberships
-            cluster_counts = Counter(cluster_labels)
+    # Build reward_p: each answer gets reward based on its cluster size
+    # For responses which didn't parse, the get 0 reward, which is already set in reward_p initialization
+    reward_p = [0.0] * total
+    is_valid = [False] * total
 
-            # Build reward_p: each answer gets reward based on its cluster size
-            reward_p = [0.0] * total
-            for i, orig_idx in enumerate(valid_indices):
-                cluster_id = cluster_labels[i]
-                reward_p[orig_idx] = cluster_counts[cluster_id] / total
-
-            # Compute entropy based on cluster distribution
-            entropy = 0.0
-            for count in cluster_counts.values():
-                probability = count / len(cluster_labels)
-                if probability > 0:
-                    entropy -= probability * math.log(probability)
-
-            # Normalize entropy
-            n_clusters = len(cluster_counts)
-            if n_clusters > 1:
-                max_entropy = math.log(n_clusters)
-                normalized_entropy = entropy / max_entropy if max_entropy > 0 else 0.0
-            else:
-                normalized_entropy = 0.0
-
-            # Find majority cluster and its representative
-            majority_cluster_id, majority_count = cluster_counts.most_common(1)[0]
-
-            # Get representative interval from majority cluster (use centroid)
-            majority_intervals = [
-                parsed_intervals[i]
-                for i, label in enumerate(cluster_labels)
-                if label == majority_cluster_id
-            ]
-            avg_start = np.mean([iv[0] for iv in majority_intervals])
-            avg_end = np.mean([iv[1] for iv in majority_intervals])
-            estimated_label = f"({avg_start:.2f}, {avg_end:.2f})"
-
-            majority_ratio = majority_count / total
-    else:
-        counter = Counter(model_answers)
-        reward_p = [counter[ans] / total for ans in model_answers]
-
+    if len(cluster_labels) == 0:
+        # No valid intervals, all get zero reward
         entropy = 0.0
-        for count in counter.values():
+        normalized_entropy = 0.0
+        estimated_label = ""
+        majority_count = 0
+        majority_ratio = 0.0
+        invalid_counts = Counter(model_answers)
+        cluster_counts = Counter(model_answers)
+        n_outcomes = len(invalid_counts)
+    else:
+        # Count cluster memberships
+        cluster_counts = Counter(cluster_labels)
+
+        invalid_answers = [ans for i, ans in enumerate(model_answers) if i not in valid_indices]
+        invalid_counts = Counter(invalid_answers)
+
+        for i, orig_idx in enumerate(valid_indices):
+            cluster_id = cluster_labels[i]
+            reward_p[orig_idx] = cluster_counts[cluster_id] / total
+            is_valid[orig_idx] = True
+
+        # Compute entropy based on cluster distribution
+        entropy = 0.0
+        for count in cluster_counts.values():
             probability = count / total
-            if probability > 0:  # Avoid log(0)
+            if probability > 0:
                 entropy -= probability * math.log(probability)
 
-        if total > 1:
-            max_entropy = math.log(
-                len(counter)
-            )  # Max entropy for this many unique answers
+        for count in invalid_counts.values():
+            probability = count / total
+            if probability > 0:
+                entropy -= probability * math.log(probability)
+
+        n_outcomes = len(cluster_counts) + len(invalid_counts)
+
+        # Normalize entropy
+        if n_outcomes > 1:
+            max_entropy = math.log(n_outcomes)
             normalized_entropy = entropy / max_entropy if max_entropy > 0 else 0.0
         else:
             normalized_entropy = 0.0
 
-        estimated_label, majority_count = counter.most_common(1)[0]
-        majority_ratio = majority_count / len(solutions)
+        # Find majority cluster and its representative
+        majority_cluster_id, majority_count = cluster_counts.most_common(1)[0]
 
-    rewards, _ = auto_verify(
-        task, solutions, [estimated_label] * len(solutions), extra_info=extra_info
-    )
-    rewards_en = [(r * 1) - (0.75 * normalized_entropy) for r in reward_p]
+        # Get representative interval from majority cluster (use centroid)
+        # majority_intervals = [
+        #     parsed_intervals[i]
+        #     for i, label in enumerate(cluster_labels)
+        #     if label == majority_cluster_id
+        # ]
+        # avg_start = np.mean([iv[0] for iv in majority_intervals])
+        # avg_end = np.mean([iv[1] for iv in majority_intervals])
+        # estimated_label = f"({avg_start:.2f}, {avg_end:.2f})"
 
-    assert len(rewards) == len(solutions), f"{len(rewards)} vs {len(solutions)}"
+        majority_ratio = majority_count / total
+
+    rewards_en = [
+        (r - (0.75 * normalized_entropy)) if valid else -1.0 
+        for r, valid in zip(reward_p, is_valid)
+    ]
 
     ttrl_metrics = {
         "majority_ratio": majority_ratio,
-        "majority_voting_reward": sum(rewards) / len(rewards),
         "normalized_entropy": normalized_entropy,
     }
 
@@ -259,8 +258,9 @@ def test_time_train_metrics(
         ttrl_metrics.update(temporal_metrics)
         ttrl_metrics.update(
             {
-                "number_of_clusters": len(cluster_counts),
-                "majority_cluster_size": majority_ratio,
+                "number_of_clusters": n_outcomes,
+                "number_of_valid_clusters": len(cluster_counts),
+                "number_of_invalid_clusters": len(invalid_counts),
             }
         )
 
