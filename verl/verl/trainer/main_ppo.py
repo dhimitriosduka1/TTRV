@@ -194,13 +194,18 @@ class TaskRunner:
             num_examine=0,
             compute_score=compute_score,
             reward_fn_key=config.data.reward_fn_key,
+            distance_threshold=trainer.distance_threshold,
             **reward_kwargs,
         )
 
         # Note that we always use function-based RM for validation
         if reward_manager_name == "ttrl":
             val_reward_fn = reward_manager_cls(
-                tokenizer=tokenizer, num_examine=1, compute_score=compute_score, reward_fn_key=config.data.reward_fn_key, eval_n_samples=config.actor_rollout_ref.rollout.val_kwargs.n
+                tokenizer=tokenizer, 
+                num_examine=1, 
+                compute_score=compute_score, 
+                reward_fn_key=config.data.reward_fn_key, 
+                eval_n_samples=config.actor_rollout_ref.rollout.val_kwargs.n, 
             )
         else:
             val_reward_fn = reward_manager_cls(

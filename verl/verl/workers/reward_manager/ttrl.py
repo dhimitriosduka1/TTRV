@@ -38,6 +38,7 @@ class TTRLRewardManager:
         n_samples_per_prompt=1,
         mode="eval",
         eval_n_samples=1,
+        distance_threshold=0.10,
     ) -> None:
         self.tokenizer = tokenizer
         self.num_examine = num_examine  # the number of batches of decoded responses to print to the console
@@ -46,6 +47,7 @@ class TTRLRewardManager:
         self.n_samples_per_prompt = n_samples_per_prompt
         self.mode = mode
         self.eval_n_samples = eval_n_samples
+        self.distance_threshold = distance_threshold
         assert (
             n_votes_per_prompt >= n_samples_per_prompt
         ), f"For TTRL settings, n_votes_per_prompt {n_votes_per_prompt} should be greater than or equal to n_samples_per_prompt {n_samples_per_prompt}"
@@ -203,7 +205,7 @@ class TTRLRewardManager:
                 group_extra_info.append(extra_info)
 
             rewards, ttrl_metrics = test_time_train_metrics(
-                group_pred_outputs, group_labels, task=task, extra_info=group_extra_info
+                group_pred_outputs, group_labels, task=task, extra_info=group_extra_info, distance_threshold=self.distance_threshold
             )
 
             for k, v in ttrl_metrics.items():
