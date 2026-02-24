@@ -1,9 +1,9 @@
 #!/bin/bash -l
 
-#SBATCH -o /dais/fs/scratch/dduka/logs/verl/verl_scaled_%A_%a.out
-#SBATCH -e /dais/fs/scratch/dduka/logs/verl/verl_scaled_%A_%a.err
+#SBATCH -o /dais/fs/scratch/dduka/logs/verl/verl_standard_%A_%a.out
+#SBATCH -e /dais/fs/scratch/dduka/logs/verl/verl_standard_%A_%a.err
 
-#SBATCH -J verl_scaled_4fps_32votes_24samples
+#SBATCH -J verl_standard_4fps_32votes_24samples_man
 #SBATCH --time=23:59:59
 
 #SBATCH --nodes=1
@@ -41,7 +41,7 @@ ADVANTAGE="grpo"
 MAX_PROMPT_LENGTH=7524
 MAX_RESPONSE_LENGTH=$((1024 * 1))
 
-N=4 #This sets the number of samples generated during validation: greedy
+N=1 #This sets the number of samples generated during validation: 
 
 DATA_TRAIN_BATCH_SIZE=64 # Batch size
 N_VOTES_PER_PROMPT=32 # Total responses generated per prompt
@@ -49,16 +49,15 @@ N_SAMPLES_PER_PROMPT=24 # Number of responses kept for the PPO training: used in
 MINI_BATCH_SIZE=16
 MICRO_BATCH_SIZE=4
 
-
-TRAIN_FILE="/u/dduka/project/RL/TTRV/verl/data/tag/4fps/scaled/train.parquet"
-VAL_FILE="/u/dduka/project/RL/TTRV/verl/data/tag/4fps/scaled/test.parquet"
+TRAIN_FILE="/u/dduka/project/RL/TTRV/verl/data/tag/4fps/with_manually_annotated_test_set/standard/train.parquet"
+VAL_FILE="/u/dduka/project/RL/TTRV/verl/data/tag/4fps/with_manually_annotated_test_set/standard/test.parquet"
 
 DATA_LOCAL_DIR="/u/dduka/project/RL/TTRV/verl/data"
 
 BACKBONE_PATH="Qwen/Qwen3-VL-8B-Instruct"
 
 MODEL="${TASK}-${BACKBONE_PATH}"
-EXPERIMENT="TTRL-SCALED-SEGMENTS-4FPS-32VOTES-24SAMPLES"
+EXPERIMENT="ORI-SEGMENTS-4FPS-32VOTES-24SAMPLES"
 
 WANDB_PROJECT="TTRL-verl"
 LOG_NAME="${EXPERIMENT}-${MODEL}-${ADVANTAGE}"
@@ -124,8 +123,8 @@ python verl/trainer/main_ppo.py \
   trainer.n_gpus_per_node=$NO_GPU \
   trainer.nnodes=1 \
   trainer.val_before_train=True \
-  trainer.save_freq=200 \
-  trainer.test_freq=200 \
+  trainer.save_freq=100 \
+  trainer.test_freq=100 \
   trainer.max_actor_ckpt_to_keep=2 \
   trainer.max_critic_ckpt_to_keep=2 \
   trainer.default_local_dir=$OUTPUT_DIR \
