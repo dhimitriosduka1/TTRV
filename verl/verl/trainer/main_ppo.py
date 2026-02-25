@@ -194,7 +194,7 @@ class TaskRunner:
             num_examine=0,
             compute_score=compute_score,
             reward_fn_key=config.data.reward_fn_key,
-            distance_threshold=trainer.distance_threshold,
+            distance_threshold=config.trainer.distance_threshold,
             **reward_kwargs,
         )
 

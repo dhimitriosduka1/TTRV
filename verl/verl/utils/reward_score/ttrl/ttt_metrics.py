@@ -252,17 +252,15 @@ def test_time_train_metrics(
         "normalized_entropy": normalized_entropy,
     }
 
-    # Add temporal-specific metrics for temporal grounding task
-    if task == "tag":
-        temporal_metrics = compute_temporal_metrics(solutions, model_answers)
-        ttrl_metrics.update(temporal_metrics)
-        ttrl_metrics.update(
-            {
-                "number_of_clusters": n_outcomes,
-                "number_of_valid_clusters": len(cluster_counts),
-                "number_of_invalid_clusters": len(invalid_counts),
-            }
-        )
+    temporal_metrics = compute_temporal_metrics(solutions, model_answers)
+    ttrl_metrics.update(temporal_metrics)
+    ttrl_metrics.update(
+        {
+            "number_of_clusters": n_outcomes,
+            "number_of_valid_clusters": len(cluster_counts),
+            "number_of_invalid_clusters": len(invalid_counts),
+        }
+    )
 
     return rewards_en, ttrl_metrics
 
