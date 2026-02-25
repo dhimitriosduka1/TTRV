@@ -121,6 +121,7 @@ class RLHFDataset(Dataset):
         self.serialize_dataset = False
         self._download()
         self._read_files_and_tokenize()
+        self.debug = True
 
     def _download(self, use_origin_parquet=False):
         from verl.utils.fs import copy_to_local
@@ -236,6 +237,9 @@ class RLHFDataset(Dataset):
 
         # Check for Qwen3-VL first (Priority)
         if self.processor is not None and "Qwen3VL" in self.processor.__class__.__name__:
+            if self.debug:
+                print("-----> Detected Qwen3VL processor, using Qwen3VL position ID logic.")
+
             from verl.models.transformers.qwen3_vl import get_rope_index
 
             position_ids = [
@@ -305,6 +309,11 @@ class RLHFDataset(Dataset):
         row_dict["index"] = index
         row_dict["tools_kwargs"] = tools_kwargs
         row_dict["interaction_kwargs"] = interaction_kwargs
+
+        if self.debug:
+            print(f"-----> Row dict: {row_dict}")
+            self.debug = False  # Only print the first time to avoid clutter
+
         return row_dict
 
     def __getstate__(self):

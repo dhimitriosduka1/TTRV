@@ -76,6 +76,7 @@ class QwenVLPreProcessor(BasicPreprocessor):
         self.factor = kwargs.get("factor", IMAGE_FACTOR)
         self.video_min_pixels = kwargs.get("video_min_pixels", VIDEO_MIN_PIXELS)
         self.video_total_pixels = kwargs.get("video_total_pixels", VIDEO_TOTAL_PIXELS)
+        self.debug = True
 
     def process_image(self, image, **kwargs) -> torch.Tensor:
         if isinstance(image, Image.Image):
@@ -103,6 +104,10 @@ class QwenVLPreProcessor(BasicPreprocessor):
         fps = kwargs.get("fps", 8)
         fps_min_frames = (kwargs.get("fps_min_frames", None),)
         fps_max_frames = (kwargs.get("fps_max_frames", None),)
+
+        if self.debug:
+            print(f"-----> Processing video with kwargs: {kwargs}")
+
         if not isinstance(video, dict) or "video" not in video:
             raise NotImplementedError(VIDEO_FORMAT_HELP)
         assert nframes is None or fps is None, "Can't use both `nframes` or `fps`"
@@ -127,9 +132,16 @@ class QwenVLPreProcessor(BasicPreprocessor):
         video["min_pixels"] = video_min_pixels
         return_video_sample_fps = kwargs.get("return_video_sample_fps", False)
         image_factor = kwargs.get("image_factor", self.factor)
-        return fetch_video(
+        result = fetch_video(
             video,
             image_patch_size=image_factor,
             return_video_sample_fps=return_video_sample_fps,
             return_video_metadata=True,
         )
+        if self.debug:
+            print(f"-----> Video result: {result}")
+
+        if self.debug:
+            self.debug = False  # Only print the first time to avoid clutter
+
+        return result
