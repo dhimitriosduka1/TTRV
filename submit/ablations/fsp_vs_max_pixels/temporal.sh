@@ -1,10 +1,10 @@
 #!/bin/bash -l
 
-#SBATCH -o /dais/fs/scratch/dduka/logs/verl/verl_standard_%A_%a.out
-#SBATCH -e /dais/fs/scratch/dduka/logs/verl/verl_standard_%A_%a.err
+#SBATCH -o /dais/fs/scratch/dduka/logs/verl/temporal_%A_%a.out
+#SBATCH -e /dais/fs/scratch/dduka/logs/verl/temporal_%A_%a.err
 
-#SBATCH -J batch_size_test
-#SBATCH --time=00:29:59
+#SBATCH -J temporal
+#SBATCH --time=23:59:59
 
 #SBATCH --nodes=1
 #SBATCH --partition="gpu1"
@@ -14,6 +14,8 @@
 #SBATCH --gres=gpu:h200:4
 #SBATCH --ntasks-per-node=1
 #SBATCH --mem=1000000
+
+#SBATCH --array=0-5%1
 
 micromamba activate verl
 module load cuda/12.8
@@ -37,25 +39,25 @@ EPISODE=1
 ADVANTAGE="grpo"
 
 MAX_PROMPT_LENGTH=7524
-MAX_RESPONSE_LENGTH=$((64 * 1))
+MAX_RESPONSE_LENGTH=16
 
-N=4 #This sets the number of samples generated during validation: 
+N=1
 
-DATA_TRAIN_BATCH_SIZE=512 # Batch size
-N_VOTES_PER_PROMPT=16 # Total responses generated per prompt
-N_SAMPLES_PER_PROMPT=10 # Number of responses kept for the PPO training: used in self._select_top_k_per_prompt(...)
+DATA_TRAIN_BATCH_SIZE=128
+N_VOTES_PER_PROMPT=16
+N_SAMPLES_PER_PROMPT=10
 MINI_BATCH_SIZE=16
 MICRO_BATCH_SIZE=4
 
-TRAIN_FILE="/u/dduka/project/RL/TTRV/verl/data/tag/4fps/standard/train.parquet"
-VAL_FILE="/u/dduka/project/RL/TTRV/verl/data/tag/4fps/standard/test.parquet"
+TRAIN_FILE="/u/dduka/project/RL/TTRV/verl/data/tag/fps_vs_max_pixels/train_run1_temporal.parquet"
+VAL_FILE="/u/dduka/project/RL/TTRV/verl/data/tag/fps_vs_max_pixels/test_run1_temporal.parquet"
 
 DATA_LOCAL_DIR="/u/dduka/project/RL/TTRV/verl/data"
 
 BACKBONE_PATH="Qwen/Qwen3-VL-8B-Instruct"
 
 MODEL="${TASK}-${BACKBONE_PATH}"
-EXPERIMENT="TTRL-ORIGINAL-SEGMENTS-4FPS-ONLY-LLM-TTTT"
+EXPERIMENT="A-TEMPORAL"
 
 WANDB_PROJECT="TTRL-verl"
 LOG_NAME="${EXPERIMENT}-${MODEL}-${ADVANTAGE}"
@@ -96,7 +98,7 @@ python verl/trainer/main_ppo.py \
   actor_rollout_ref.rollout.free_cache_engine=False \
   actor_rollout_ref.rollout.log_prob_micro_batch_size_per_gpu=$MICRO_BATCH_SIZE \
   actor_rollout_ref.rollout.tensor_model_parallel_size=1 \
-  actor_rollout_ref.rollout.gpu_memory_utilization=0.65 \
+  actor_rollout_ref.rollout.gpu_memory_utilization=0.75 \
   actor_rollout_ref.rollout.do_vote=True \
   actor_rollout_ref.rollout.n_vote=$N_VOTES_PER_PROMPT \
   actor_rollout_ref.rollout.n=$N_SAMPLES_PER_PROMPT \
@@ -106,7 +108,6 @@ python verl/trainer/main_ppo.py \
   actor_rollout_ref.rollout.val_kwargs.temperature=1.0 \
   actor_rollout_ref.rollout.max_model_len=32768 \
   actor_rollout_ref.rollout.max_num_batched_tokens=32768 \
-  +actor_rollout_ref.model.freeze_vision_tower=True \
   critic.optim.lr=9e-6 \
   critic.model.use_remove_padding=True \
   critic.model.path=$BACKBONE_PATH \
@@ -123,8 +124,9 @@ python verl/trainer/main_ppo.py \
   trainer.nnodes=1 \
   trainer.val_before_train=True \
   trainer.save_freq=200 \
-  trainer.test_freq=200 \
-  trainer.max_actor_ckpt_to_keep=3 \
-  trainer.max_critic_ckpt_to_keep=3 \
+  trainer.test_freq=100 \
+  trainer.max_actor_ckpt_to_keep=2 \
+  trainer.max_critic_ckpt_to_keep=2 \
   trainer.default_local_dir=$OUTPUT_DIR \
   trainer.total_epochs=$EPISODE "$@" 2>&1 | tee "$LOG_FILE" \
+  trainer.distance_threshold=0.5
