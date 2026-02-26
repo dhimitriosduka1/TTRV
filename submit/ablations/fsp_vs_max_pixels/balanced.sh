@@ -43,7 +43,7 @@ MAX_RESPONSE_LENGTH=16
 
 N=1
 
-DATA_TRAIN_BATCH_SIZE=128
+DATA_TRAIN_BATCH_SIZE=64
 N_VOTES_PER_PROMPT=16
 N_SAMPLES_PER_PROMPT=10
 MINI_BATCH_SIZE=16
@@ -57,7 +57,7 @@ DATA_LOCAL_DIR="/u/dduka/project/RL/TTRV/verl/data"
 BACKBONE_PATH="Qwen/Qwen3-VL-8B-Instruct"
 
 MODEL="${TASK}-${BACKBONE_PATH}"
-EXPERIMENT="A-BALANCED" 
+EXPERIMENT="ABL-BALANCED" 
 
 WANDB_PROJECT="TTRL-verl"
 LOG_NAME="${EXPERIMENT}-${MODEL}-${ADVANTAGE}"
@@ -98,7 +98,7 @@ python verl/trainer/main_ppo.py \
   actor_rollout_ref.rollout.free_cache_engine=False \
   actor_rollout_ref.rollout.log_prob_micro_batch_size_per_gpu=$MICRO_BATCH_SIZE \
   actor_rollout_ref.rollout.tensor_model_parallel_size=1 \
-  actor_rollout_ref.rollout.gpu_memory_utilization=0.75 \
+  actor_rollout_ref.rollout.gpu_memory_utilization=0.65 \
   actor_rollout_ref.rollout.do_vote=True \
   actor_rollout_ref.rollout.n_vote=$N_VOTES_PER_PROMPT \
   actor_rollout_ref.rollout.n=$N_SAMPLES_PER_PROMPT \
@@ -122,7 +122,7 @@ python verl/trainer/main_ppo.py \
   trainer.experiment_name=$LOG_NAME \
   trainer.n_gpus_per_node=$NO_GPU \
   trainer.nnodes=1 \
-  trainer.val_before_train=True \
+  trainer.val_before_train=False \
   trainer.save_freq=200 \
   trainer.test_freq=100 \
   trainer.max_actor_ckpt_to_keep=2 \
