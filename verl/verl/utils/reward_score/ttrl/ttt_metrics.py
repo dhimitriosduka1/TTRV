@@ -259,6 +259,8 @@ def test_time_train_metrics(
             "number_of_clusters": n_outcomes,
             "number_of_valid_clusters": len(cluster_counts),
             "number_of_invalid_clusters": len(invalid_counts),
+            "percentage_of_valid_clusters": len(cluster_counts) / n_outcomes if n_outcomes > 0 else 0.0,
+            "percentage_of_invalid_clusters": len(invalid_counts) / n_outcomes if n_outcomes > 0 else 0.0,
         }
     )
 
