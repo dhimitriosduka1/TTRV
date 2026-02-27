@@ -57,7 +57,7 @@ DATA_LOCAL_DIR="/u/dduka/project/RL/TTRV/verl/data"
 BACKBONE_PATH="Qwen/Qwen3-VL-8B-Instruct"
 
 MODEL="${TASK}-${BACKBONE_PATH}"
-EXPERIMENT="ABL-BALANCED" 
+EXPERIMENT="AB-BALANCED" 
 
 WANDB_PROJECT="TTRL-verl"
 LOG_NAME="${EXPERIMENT}-${MODEL}-${ADVANTAGE}"
@@ -122,7 +122,7 @@ python verl/trainer/main_ppo.py \
   trainer.experiment_name=$LOG_NAME \
   trainer.n_gpus_per_node=$NO_GPU \
   trainer.nnodes=1 \
-  trainer.val_before_train=False \
+  trainer.val_before_train=True \
   trainer.save_freq=200 \
   trainer.test_freq=100 \
   trainer.max_actor_ckpt_to_keep=2 \

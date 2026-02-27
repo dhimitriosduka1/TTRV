@@ -1,9 +1,9 @@
 #!/bin/bash -l
 
-#SBATCH -o /dais/fs/scratch/dduka/logs/verl/balanced_scaled_%A_%a.out
-#SBATCH -e /dais/fs/scratch/dduka/logs/verl/balanced_scaled_%A_%a.err
+#SBATCH -o /dais/fs/scratch/dduka/logs/verl/verl_scaled_8fps_32votes_24_samples_%A_%a.out
+#SBATCH -e /dais/fs/scratch/dduka/logs/verl/verl_scaled_8fps_32votes_24_samples_%A_%a.err
 
-#SBATCH -J balanced_scaled
+#SBATCH -J verl_scaled_8fps_32votes_24samples_man
 #SBATCH --time=23:59:59
 
 #SBATCH --nodes=1
@@ -15,7 +15,7 @@
 #SBATCH --ntasks-per-node=1
 #SBATCH --mem=1000000
 
-#SBATCH --array=0-5%1
+#SBATCH --array=0-10%1
 
 micromamba activate verl
 module load cuda/12.8
@@ -26,7 +26,7 @@ cd /u/dduka/project/RL/TTRV/verl
 unset VLLM_ATTENTION_BACKEND
 export VLLM_USE_V1=1
 export PYTHONPATH=$PYTHONPATH:/u/dduka/project/RL/TTRV/verl
-# export RAY_TMPDIR=/dais/fs/scratch/dduka
+export RAY_TMPDIR=/dais/fs/scratch/dduka
 
 mkdir -p logs
 
@@ -44,20 +44,20 @@ MAX_RESPONSE_LENGTH=16
 N=1
 
 DATA_TRAIN_BATCH_SIZE=64
-N_VOTES_PER_PROMPT=16
-N_SAMPLES_PER_PROMPT=10
+N_VOTES_PER_PROMPT=32
+N_SAMPLES_PER_PROMPT=24
 MINI_BATCH_SIZE=16
 MICRO_BATCH_SIZE=4
 
-TRAIN_FILE="/u/dduka/project/RL/TTRV/verl/data/tag/fps_vs_max_pixels/train_run3_balanced_scaled.parquet"
-VAL_FILE="/u/dduka/project/RL/TTRV/verl/data/tag/fps_vs_max_pixels/test_run3_balanced_scaled.parquet"
+TRAIN_FILE="/u/dduka/project/RL/TTRV/verl/data/tag/8fps/with_manually_annotated_test_set/scaled/train.parquet"
+VAL_FILE="/u/dduka/project/RL/TTRV/verl/data/tag/8fps/with_manually_annotated_test_set/scaled/test.parquet"
 
 DATA_LOCAL_DIR="/u/dduka/project/RL/TTRV/verl/data"
 
 BACKBONE_PATH="Qwen/Qwen3-VL-8B-Instruct"
 
 MODEL="${TASK}-${BACKBONE_PATH}"
-EXPERIMENT="AB-BALANCED-SCALED" 
+EXPERIMENT="SCA-SEGMENTS-8FPS-32V-24S"
 
 WANDB_PROJECT="TTRL-verl"
 LOG_NAME="${EXPERIMENT}-${MODEL}-${ADVANTAGE}"
@@ -122,11 +122,11 @@ python verl/trainer/main_ppo.py \
   trainer.experiment_name=$LOG_NAME \
   trainer.n_gpus_per_node=$NO_GPU \
   trainer.nnodes=1 \
-  trainer.val_before_train=True \
+  trainer.val_before_train=False \
   trainer.save_freq=200 \
   trainer.test_freq=100 \
   trainer.max_actor_ckpt_to_keep=2 \
   trainer.max_critic_ckpt_to_keep=2 \
   trainer.default_local_dir=$OUTPUT_DIR \
   trainer.total_epochs=$EPISODE "$@" 2>&1 | tee "$LOG_FILE" \
-  trainer.distance_threshold=0.5
+  trainer.distance_threshold=0.1 \

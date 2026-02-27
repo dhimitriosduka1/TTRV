@@ -11,7 +11,7 @@
 #SBATCH --cpus-per-task=48
 #SBATCH --threads-per-core=1
 
-#SBATCH --gres=gpu:h200:4
+#SBATCH --gres=gpu:4
 #SBATCH --ntasks-per-node=1
 #SBATCH --mem=1000000
 
@@ -26,7 +26,7 @@ cd /u/dduka/project/RL/TTRV/verl
 unset VLLM_ATTENTION_BACKEND
 export VLLM_USE_V1=1
 export PYTHONPATH=$PYTHONPATH:/u/dduka/project/RL/TTRV/verl
-export RAY_TMPDIR=/dais/fs/scratch/dduka
+# export RAY_TMPDIR=/dais/fs/scratch/dduka
 
 mkdir -p logs
 
@@ -57,7 +57,7 @@ DATA_LOCAL_DIR="/u/dduka/project/RL/TTRV/verl/data"
 BACKBONE_PATH="Qwen/Qwen3-VL-8B-Instruct"
 
 MODEL="${TASK}-${BACKBONE_PATH}"
-EXPERIMENT="ABL-TEMPORAL-SCALED"
+EXPERIMENT="AB-TEMPORAL-SCALED"
 
 WANDB_PROJECT="TTRL-verl"
 LOG_NAME="${EXPERIMENT}-${MODEL}-${ADVANTAGE}"
@@ -122,7 +122,7 @@ python verl/trainer/main_ppo.py \
   trainer.experiment_name=$LOG_NAME \
   trainer.n_gpus_per_node=$NO_GPU \
   trainer.nnodes=1 \
-  trainer.val_before_train=False \
+  trainer.val_before_train=True \
   trainer.save_freq=200 \
   trainer.test_freq=100 \
   trainer.max_actor_ckpt_to_keep=2 \
