@@ -26,7 +26,6 @@ cd /u/dduka/project/RL/TTRV/verl
 unset VLLM_ATTENTION_BACKEND
 export VLLM_USE_V1=1
 export PYTHONPATH=$PYTHONPATH:/u/dduka/project/RL/TTRV/verl
-# export RAY_TMPDIR=/dais/fs/scratch/dduka
 
 mkdir -p logs
 

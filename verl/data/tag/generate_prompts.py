@@ -6,7 +6,7 @@ import pandas as pd
 MANUALLY_ANNOTATED_VIDEOS_PATH = "/u/dduka/project/RL/TTRV/verl/data/tag/test_gt.csv"
 BASE_OUTPUT_DIR = "/u/dduka/project/RL/TTRV/verl/data/tag/"
 VIDEO_BASE = "/dais/fs/scratch/dduka/databases/ego4d/video_320px_15sec"
-PICKLE_PATH = "/dais/fs/scratch/dduka/databases/ego4d/ego4d_train_with_uuid.pkl"
+PICKLE_PATH = "/dais/fs/scratch/dduka/databases/ego4d/random_shift/ego4d_train_random_shift_2.1_2.1_1.0_with_uuid.pkl"
 CHUNK_DURATION = 15
 PROMPT_TEMPLATE = """TASK: Temporal localization in egocentric video.
 

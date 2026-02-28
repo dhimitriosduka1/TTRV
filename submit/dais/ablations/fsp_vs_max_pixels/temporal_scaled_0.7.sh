@@ -1,21 +1,21 @@
 #!/bin/bash -l
 
-#SBATCH -o /dais/fs/scratch/dduka/logs/verl/verl_scaled_%A_%a.out
-#SBATCH -e /dais/fs/scratch/dduka/logs/verl/verl_scaled_%A_%a.err
+#SBATCH -o /dais/fs/scratch/dduka/logs/verl/temporal_scaled_%A_%a.out
+#SBATCH -e /dais/fs/scratch/dduka/logs/verl/temporal_scaled_%A_%a.err
 
-#SBATCH -J verl_scaled_8fps_man
+#SBATCH -J temporal_scaled_0.7
 #SBATCH --time=23:59:59
 
 #SBATCH --nodes=1
 #SBATCH --partition="gpu1"
-#SBATCH --cpus-per-task=48
-#SBATCH --threads-per-core=1
 
 #SBATCH --gres=gpu:4
 #SBATCH --ntasks-per-node=1
+#SBATCH --cpus-per-task=48
+#SBATCH --threads-per-core=1
 #SBATCH --mem=1000000
 
-#SBATCH --array=0-10%1
+#SBATCH --array=0-5%1
 
 micromamba activate verl
 module load cuda/12.8
@@ -26,7 +26,6 @@ cd /u/dduka/project/RL/TTRV/verl
 unset VLLM_ATTENTION_BACKEND
 export VLLM_USE_V1=1
 export PYTHONPATH=$PYTHONPATH:/u/dduka/project/RL/TTRV/verl
-export RAY_TMPDIR=/dais/fs/scratch/dduka
 
 mkdir -p logs
 
@@ -49,15 +48,15 @@ N_SAMPLES_PER_PROMPT=10
 MINI_BATCH_SIZE=16
 MICRO_BATCH_SIZE=4
 
-TRAIN_FILE="/u/dduka/project/RL/TTRV/verl/data/tag/8fps/with_manually_annotated_test_set/scaled/train.parquet"
-VAL_FILE="/u/dduka/project/RL/TTRV/verl/data/tag/8fps/with_manually_annotated_test_set/scaled/test.parquet"
+TRAIN_FILE="/u/dduka/project/RL/TTRV/verl/data/tag/fps_vs_max_pixels/train_run1_temporal_scaled.parquet"
+VAL_FILE="/u/dduka/project/RL/TTRV/verl/data/tag/fps_vs_max_pixels/test_run1_temporal_scaled.parquet"
 
 DATA_LOCAL_DIR="/u/dduka/project/RL/TTRV/verl/data"
 
 BACKBONE_PATH="Qwen/Qwen3-VL-8B-Instruct"
 
 MODEL="${TASK}-${BACKBONE_PATH}"
-EXPERIMENT="SCA-SEGMENTS-8FPS"
+EXPERIMENT="AB-TEMPORAL-SCALED-0.7"
 
 WANDB_PROJECT="TTRL-verl"
 LOG_NAME="${EXPERIMENT}-${MODEL}-${ADVANTAGE}"
@@ -123,9 +122,10 @@ python verl/trainer/main_ppo.py \
   trainer.n_gpus_per_node=$NO_GPU \
   trainer.nnodes=1 \
   trainer.val_before_train=True \
-  trainer.save_freq=100 \
+  trainer.save_freq=200 \
   trainer.test_freq=100 \
   trainer.max_actor_ckpt_to_keep=2 \
   trainer.max_critic_ckpt_to_keep=2 \
   trainer.default_local_dir=$OUTPUT_DIR \
-  trainer.total_epochs=$EPISODE "$@" 2>&1 | tee "$LOG_FILE"
+  trainer.total_epochs=$EPISODE "$@" 2>&1 | tee "$LOG_FILE" \
+  trainer.distance_threshold=0.7

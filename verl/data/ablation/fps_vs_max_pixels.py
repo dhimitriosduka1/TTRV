@@ -59,8 +59,8 @@ if __name__ == "__main__":
         )
 
         # Output to distinct parquet files
-        train_output = os.path.join(data_dir, f"train_{run_name}.parquet")
-        test_output = os.path.join(data_dir, f"test_{run_name}.parquet")
+        train_output = os.path.join(data_dir, f"train_{run_name}_scaled.parquet")
+        test_output = os.path.join(data_dir, f"test_{run_name}_scaled.parquet")
 
         mapped_train.to_parquet(train_output)
         mapped_test.to_parquet(test_output)
